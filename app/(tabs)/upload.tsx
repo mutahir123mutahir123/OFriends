@@ -13,8 +13,6 @@ import {
   Animated,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { createVideoPlayer } from 'expo-video';
-import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -23,22 +21,16 @@ import { useAuth } from '@/lib/auth';
 import { compressImage, compressStoryImage, formatBytes } from '@/lib/compress';
 import { Colors, FontFamily, FontSize, Spacing, BorderRadius } from '@/lib/theme';
 
-type MediaType = 'picture' | 'reel' | 'story';
+type MediaType = 'picture' | 'story';
 
 type PickedAsset = {
   uri: string;
-  type: 'image' | 'video';
   fileSize?: number;
-  thumbnailUri?: string; // extracted poster frame for videos
 };
 
 // ── Upload steps & their progress weights ─────────────────────────────────────
 const STEPS = {
-  thumbnail: { label: 'Extracting thumbnail…', progress: 0.15 },
-  compressThumb: { label: 'Processing…',           progress: 0.25 },
-  uploadThumb: { label: 'Uploading thumbnail…',   progress: 0.40 },
-  uploadMedia: { label: 'Uploading video…',        progress: 0.85 },
-  save: { label: 'Saving…',                        progress: 0.95 },
+  save: { label: 'Saving…', progress: 0.95 },
 };
 
 export default function UploadScreen() {
@@ -50,7 +42,7 @@ export default function UploadScreen() {
 
   useEffect(() => {
     void (async () => {
-      const validTypes: MediaType[] = ['picture', 'reel', 'story'];
+      const validTypes: MediaType[] = ['picture', 'story'];
       if (type && validTypes.includes(type as MediaType)) {
         setMediaType(type as MediaType);
         setAsset(null);
@@ -79,42 +71,17 @@ export default function UploadScreen() {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes:
-        mediaType === 'reel'
-          ? ImagePicker.MediaTypeOptions.Videos
-          : ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
-      aspect: mediaType === 'reel' ? [9, 16] : [4, 5],
+      aspect: [4, 5],
       quality: 1.0,
-      videoMaxDuration: 30, // 30 s cap — keeps file size manageable
     });
 
     if (!result.canceled && result.assets[0]) {
       const picked = result.assets[0];
-      const isVideo = picked.type === 'video';
-
-      let thumbnailUri: string | undefined;
-      if (isVideo) {
-        const player = createVideoPlayer(picked.uri);
-        try {
-          const [thumbnail] = await player.generateThumbnailsAsync(0);
-          const rendered = await ImageManipulator.manipulate(thumbnail);
-          const saved = await rendered.renderAsync().then((img) =>
-            img.saveAsync({ format: SaveFormat.JPEG, compress: 0.8 })
-          );
-          thumbnailUri = saved.uri;
-        } catch {
-          // Thumbnail extraction failed — proceed without it
-        } finally {
-          player.release();
-        }
-      }
-
       setAsset({
         uri: picked.uri,
-        type: isVideo ? 'video' : 'image',
         fileSize: picked.fileSize,
-        thumbnailUri,
       });
     }
   };
@@ -152,44 +119,19 @@ export default function UploadScreen() {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token ?? process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
       const base = `${user.id}/${Date.now()}`;
-      let mediaUrl = '';
-      let thumbnailUrl: string | undefined;
 
-      if (asset.type === 'video') {
-        // ── Step 1: compress thumbnail ─────────────────────────────────────
-        setStepLabel(STEPS.thumbnail.label);
-        setProgress(STEPS.thumbnail.progress);
-        let thumbUri = asset.thumbnailUri;
-        if (thumbUri) {
-          setStepLabel(STEPS.compressThumb.label);
-          setProgress(STEPS.compressThumb.progress);
-          thumbUri = await compressImage(thumbUri);
+      // ── Compress, then upload ──────────────────────────────────────────────
+      setStepLabel('Compressing…');
+      setProgress(0.3);
+      const compressed =
+        mediaType === 'story'
+          ? await compressStoryImage(asset.uri)
+          : await compressImage(asset.uri);
+      setStepLabel('Uploading…');
+      setProgress(0.7);
+      const mediaUrl = await uploadFile(compressed, `${base}.jpg`, 'image/jpeg', token);
 
-          // ── Step 2: upload thumbnail ───────────────────────────────────
-          setStepLabel(STEPS.uploadThumb.label);
-          setProgress(STEPS.uploadThumb.progress);
-          thumbnailUrl = await uploadFile(thumbUri, `${base}_thumb.jpg`, 'image/jpeg', token);
-        }
-
-        // ── Step 3: upload video ───────────────────────────────────────────
-        setStepLabel(STEPS.uploadMedia.label);
-        setProgress(STEPS.uploadMedia.progress);
-        mediaUrl = await uploadFile(asset.uri, `${base}.mp4`, 'video/mp4', token);
-
-      } else {
-        // ── Image path ────────────────────────────────────────────────────
-        setStepLabel('Compressing…');
-        setProgress(0.3);
-        const compressed =
-          mediaType === 'story'
-            ? await compressStoryImage(asset.uri)
-            : await compressImage(asset.uri);
-        setStepLabel('Uploading…');
-        setProgress(0.7);
-        mediaUrl = await uploadFile(compressed, `${base}.jpg`, 'image/jpeg', token);
-      }
-
-      // ── Step 4: save to database ───────────────────────────────────────────
+      // ── Save to database ───────────────────────────────────────────────────
       setStepLabel(STEPS.save.label);
       setProgress(STEPS.save.progress);
 
@@ -204,7 +146,6 @@ export default function UploadScreen() {
           user_id: user.id,
           type: mediaType,
           media_url: mediaUrl,
-          thumbnail_url: thumbnailUrl ?? null,
           caption: caption.trim() || null,
         });
         if (error) throw new Error(error.message);
@@ -229,8 +170,7 @@ export default function UploadScreen() {
     }
   };
 
-  // Preview image: use extracted thumbnail for videos, the image itself otherwise
-  const previewUri = asset?.thumbnailUri ?? (asset?.type === 'image' ? asset?.uri : undefined);
+  const previewUri = asset?.uri;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -241,14 +181,14 @@ export default function UploadScreen() {
 
       {/* Type Selector */}
       <View style={styles.typeRow}>
-        {(['picture', 'reel', 'story'] as MediaType[]).map((t) => (
+        {(['picture', 'story'] as MediaType[]).map((t) => (
           <TouchableOpacity
             key={t}
             style={[styles.typeBtn, mediaType === t && styles.typeBtnActive]}
             onPress={() => { setMediaType(t); setAsset(null); }}
           >
             <Text style={[styles.typeBtnText, mediaType === t && styles.typeBtnTextActive]}>
-              {t === 'picture' ? '📷 Photo' : t === 'reel' ? '🎬 Reel' : '⏱ Story'}
+              {t === 'picture' ? '📷 Photo' : '⏱ Story'}
             </Text>
           </TouchableOpacity>
         ))}
@@ -259,12 +199,6 @@ export default function UploadScreen() {
         {previewUri ? (
           <>
             <Image source={{ uri: previewUri }} style={styles.mediaPreview} resizeMode="cover" />
-            {/* Play icon overlay for videos */}
-            {asset?.type === 'video' && (
-              <View style={styles.playOverlay}>
-                <Text style={styles.playIcon}>▶</Text>
-              </View>
-            )}
             {asset?.fileSize ? (
               <View style={styles.sizeBadge}>
                 <Text style={styles.sizeBadgeText}>{formatBytes(asset.fileSize)}</Text>
@@ -273,13 +207,9 @@ export default function UploadScreen() {
           </>
         ) : (
           <View style={styles.mediaPlaceholder}>
-            <Text style={styles.mediaPlaceholderIcon}>
-              {mediaType === 'reel' ? '🎬' : '📷'}
-            </Text>
+            <Text style={styles.mediaPlaceholderIcon}>📷</Text>
             <Text style={styles.mediaPlaceholderText}>
-              {mediaType === 'reel'
-                ? 'Tap to select a video (max 30s)'
-                : 'Tap to select a photo'}
+              Tap to select a photo
             </Text>
           </View>
         )}
@@ -388,13 +318,6 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   mediaPreview: { width: '100%', height: '100%' },
-  playOverlay: {
-    ...StyleSheet.absoluteFill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.28)',
-  },
-  playIcon: { fontSize: 52, color: Colors.white },
   sizeBadge: {
     position: 'absolute',
     bottom: Spacing.sm,

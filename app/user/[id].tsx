@@ -147,9 +147,6 @@ export default function UserProfileScreen() {
             onPress={() => router.push(`/post/${post.id}` as any)}
           >
             <Image source={{ uri: post.media_url }} style={styles.gridImage} resizeMode="cover" />
-            {post.type === 'reel' && (
-              <View style={styles.reelOverlay}><Text style={styles.reelPlay}>▶</Text></View>
-            )}
           </TouchableOpacity>
         ))}
       </View>
@@ -223,6 +220,4 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 1 },
   gridItem: { width: GRID_SIZE, height: GRID_SIZE, overflow: 'hidden' },
   gridImage: { width: '100%', height: '100%' },
-  reelOverlay: { position: 'absolute', bottom: 6, left: 6, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 },
-  reelPlay: { color: Colors.white, fontSize: 10 },
 });

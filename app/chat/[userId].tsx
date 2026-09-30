@@ -170,7 +170,6 @@ export default function ChatScreen() {
         renderItem={({ item }) => {
           const isMe = item.sender_id === user?.id;
           const hasMedia = !!item.media_url;
-          const isReel = item.posts?.type === 'reel';
           return (
             <View style={[styles.bubbleRow, isMe ? styles.bubbleRowMe : styles.bubbleRowThem]}>
               <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleThem, hasMedia && { paddingHorizontal: 0, paddingVertical: 0, overflow: 'hidden', maxWidth: '70%' }]}>
@@ -182,11 +181,6 @@ export default function ChatScreen() {
                         style={{ width: IMAGE_WIDTH, height: IMAGE_WIDTH * 1.25, borderRadius: 12 }}
                         resizeMode="cover"
                       />
-                      {isReel && (
-                        <View style={styles.reelPlayOverlay} pointerEvents="none">
-                          <Ionicons name="play-circle" size={42} color="rgba(255,255,255,0.85)" />
-                        </View>
-                      )}
                     </View>
                     {item.text ? (
                       <Text style={[styles.bubbleText, isMe ? styles.bubbleTextMe : styles.bubbleTextThem, { paddingHorizontal: 10, paddingVertical: 6 }]}>
@@ -195,14 +189,10 @@ export default function ChatScreen() {
                     ) : null}
                     <TouchableOpacity
                       style={styles.viewPostBtn}
-                      onPress={() =>
-                        isReel
-                          ? router.push(`/reel/${item.post_id}` as any)
-                          : router.push(`/post/${item.post_id}` as any)
-                      }
+                      onPress={() => router.push(`/post/${item.post_id}` as any)}
                     >
-                      <Ionicons name={isReel ? 'film-outline' : 'eye-outline'} size={14} color={Colors.white} />
-                      <Text style={styles.viewPostText}>{isReel ? 'View Reel' : 'View Post'}</Text>
+                      <Ionicons name="eye-outline" size={14} color={Colors.white} />
+                      <Text style={styles.viewPostText}>View Post</Text>
                     </TouchableOpacity>
                   </>
                 ) : (
@@ -335,12 +325,6 @@ const styles = StyleSheet.create({
     paddingBottom: 2,
   },
   sendBtnDisabled: { opacity: 0.3 },
-  reelPlayOverlay: {
-    ...StyleSheet.absoluteFill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
-  },
   viewPostBtn: {
     flexDirection: 'row',
     alignItems: 'center',

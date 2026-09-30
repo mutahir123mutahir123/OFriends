@@ -29,6 +29,7 @@ export function useFeed(userId: string, mode: FeedMode = 'following') {
         const { data: postsData } = await supabase
           .from('posts')
           .select('*, profiles(id, username, avatar_url)')
+          .eq('type', 'picture')
           .in('user_id', ids)
           .order('created_at', { ascending: false })
           .limit(30);
@@ -38,6 +39,7 @@ export function useFeed(userId: string, mode: FeedMode = 'following') {
         const { data: postsData } = await supabase
           .from('posts')
           .select('*, profiles(id, username, avatar_url)')
+          .eq('type', 'picture')
           .order('created_at', { ascending: false })
           .limit(30);
 

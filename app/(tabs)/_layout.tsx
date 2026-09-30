@@ -15,7 +15,6 @@ type TabConfig = {
 const TABS: TabConfig[] = [
   { name: 'index',    icon: 'home-outline',       iconFilled: 'home'           },
   { name: 'search',   icon: 'search-outline',     iconFilled: 'search'         },
-  { name: 'reels',    icon: 'film-outline',        iconFilled: 'film'           },
   { name: 'messages', icon: 'chatbubble-outline',  iconFilled: 'chatbubble'    },
   { name: 'profile',  icon: 'person-outline',      iconFilled: 'person'        },
 ];

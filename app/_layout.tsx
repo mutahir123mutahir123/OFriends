@@ -44,7 +44,6 @@ function RootLayoutNav() {
       <Stack.Screen name="instant/mine"   options={{ presentation: 'modal' }} />
       <Stack.Screen name="reset-password" />
       <Stack.Screen name="settings" />
-      <Stack.Screen name="reel/[id]" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
     </Stack>
   );
 }

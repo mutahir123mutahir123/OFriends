@@ -39,7 +39,7 @@ export default function ProfileScreen() {
   const [posts, setPosts] = useState<any[]>([]);
   const [counts, setCounts] = useState({ posts: 0, followers: 0, following: 0 });
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<'posts' | 'reels' | 'stories'>('posts');
+  const [tab, setTab] = useState<'posts' | 'stories'>('posts');
 
   // Create sheet state
   const [createSheetVisible, setCreateSheetVisible] = useState(false);
@@ -242,7 +242,7 @@ export default function ProfileScreen() {
     ]);
   };
 
-  const filteredPosts = posts.filter((p) => (tab === 'posts' ? p.type === 'picture' : p.type === 'reel'));
+  const filteredPosts = posts.filter((p) => p.type === 'picture');
   const myStories = (posts as any[]).filter((p: any) => p.type === 'story');
 
   if (loading) {
@@ -322,53 +322,37 @@ export default function ProfileScreen() {
         <TouchableOpacity style={[styles.tabBtn, tab === 'posts' && styles.tabBtnActive]} onPress={() => setTab('posts')}>
           <Text style={[styles.tabText, tab === 'posts' && styles.tabTextActive]}>Posts</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.tabBtn, tab === 'reels' && styles.tabBtnActive]} onPress={() => setTab('reels')}>
-          <Text style={[styles.tabText, tab === 'reels' && styles.tabTextActive]}>Reels</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.tabBtn, (tab as string) === 'stories' && styles.tabBtnActive]} onPress={() => setTab('stories' as any)}>
-          <Text style={[styles.tabText, (tab as string) === 'stories' && styles.tabTextActive]}>Stories</Text>
+        <TouchableOpacity style={[styles.tabBtn, tab === 'stories' && styles.tabBtnActive]} onPress={() => setTab('stories')}>
+          <Text style={[styles.tabText, tab === 'stories' && styles.tabTextActive]}>Stories</Text>
         </TouchableOpacity>
       </View>
 
       {/* Grid */}
       <View style={styles.grid}>
-        {((tab as string) === 'stories' ? myStories : filteredPosts).map((post) => (
+        {(tab === 'stories' ? myStories : filteredPosts).map((post) => (
           <View key={post.id} style={styles.gridItemWrapper}>
             <TouchableOpacity
               style={styles.gridItem}
               activeOpacity={0.9}
               onPress={() => {
-                if ((tab as string) === 'stories') return;
-                if (post.type === 'reel') router.push({
-                  pathname: `/reel/${post.id}` as any,
-                  params: { mediaUrl: post.media_url, thumbUrl: post.thumbnail_url ?? '' },
-                });
-                else router.push(`/post/${post.id}` as any);
+                if (tab === 'stories') return;
+                router.push(`/post/${post.id}` as any);
               }}
               onLongPress={() =>
-                (tab as string) === 'stories'
-                  ? deleteStory(post.id)
-                  : deletePost(post.id)
+                tab === 'stories' ? deleteStory(post.id) : deletePost(post.id)
               }
               delayLongPress={500}
             >
               <Image
-                source={{ uri: post.type === 'reel' ? (post.thumbnail_url ?? post.media_url) : post.media_url }}
+                source={{ uri: post.media_url }}
                 style={styles.gridImage}
                 resizeMode="cover"
               />
-              {post.type === 'reel' && (
-                <View style={styles.reelOverlay}>
-                  <Text style={styles.reelPlay}>▶</Text>
-                </View>
-              )}
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.deleteBadge}
               onPress={() =>
-                (tab as string) === 'stories'
-                  ? deleteStory(post.id)
-                  : deletePost(post.id)
+                tab === 'stories' ? deleteStory(post.id) : deletePost(post.id)
               }
               activeOpacity={0.6}
             >
@@ -494,7 +478,6 @@ export default function ProfileScreen() {
 }
 
 const CREATE_OPTIONS = [
-  { label: 'Reel', icon: 'film-outline', type: 'reel' },
   { label: 'Story', icon: 'add-circle-outline', type: 'story' },
   { label: 'Post', icon: 'image-outline', type: 'picture' },
 ] as const;
@@ -613,16 +596,6 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 1 },
   gridItem: { width: GRID_SIZE, height: GRID_SIZE, overflow: 'hidden' },
   gridImage: { width: '100%', height: '100%' },
-  reelOverlay: {
-    position: 'absolute',
-    bottom: 6,
-    left: 6,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: 4,
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-  },
-  reelPlay: { color: Colors.white, fontSize: 10 },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.85)',

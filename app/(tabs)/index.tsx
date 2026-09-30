@@ -15,7 +15,6 @@ import {
   TextInput,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { useVideoPlayer, VideoView } from 'expo-video';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, FontFamily, FontSize, Spacing, BorderRadius } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
@@ -39,14 +38,6 @@ export default function FeedScreen() {
   const router = useRouter();
 
   const [sharingPost, setSharingPost] = useState<any>(null);
-  const [activePostId, setActivePostId] = useState<string | null>(null);
-
-  // Viewability config for inline reel autoplay
-  const [viewabilityConfig] = useState(() => ({ itemVisiblePercentThreshold: 55 }));
-  const onViewableItemsChanged = useCallback(({ viewableItems }: any) => {
-    const top = viewableItems.find((v: any) => v.isViewable);
-    setActivePostId(top?.item?.id ?? null);
-  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -199,7 +190,6 @@ export default function FeedScreen() {
             currentUserId={user?.id ?? ''}
             onDelete={handleDeletePost}
             onShare={setSharingPost}
-            isActive={item.id === activePostId}
           />
         )}
         ListHeaderComponent={ListHeader}
@@ -208,8 +198,6 @@ export default function FeedScreen() {
         onRefresh={() => { refreshFeed(); refreshStories(); }}
         refreshing={loading}
         showsVerticalScrollIndicator={false}
-        viewabilityConfig={viewabilityConfig}
-        onViewableItemsChanged={onViewableItemsChanged}
       />
 
       {/* In-app share sheet */}
@@ -229,10 +217,9 @@ type PostCardProps = {
   currentUserId: string;
   onDelete: (id: string) => void;
   onShare: (post: any) => void;
-  isActive?: boolean;
 };
 
-function PostCard({ post, currentUserId, onDelete, onShare, isActive = false }: PostCardProps) {
+function PostCard({ post, currentUserId, onDelete, onShare }: PostCardProps) {
   const router = useRouter();
   const imageHeight = SCREEN_WIDTH * (5 / 4);
   const isOwner = post.user_id === currentUserId;
@@ -281,18 +268,6 @@ function PostCard({ post, currentUserId, onDelete, onShare, isActive = false }: 
 
   // Double-tap detection
   const lastTap = useRef<number>(0);
-
-  // Inline reel player — autoplays muted when this card is in the viewport
-  const reelPlayer = useVideoPlayer(post.type === 'reel' ? post.media_url : null, (player) => {
-    player.loop = true;
-    player.muted = true;
-  });
-
-  useEffect(() => {
-    if (post.type !== 'reel') return;
-    if (isActive) reelPlayer.play();
-    else reelPlayer.pause();
-  }, [post.type, isActive, reelPlayer]);
 
   const burstHeart = () => {
     heartScale.setValue(0);
@@ -383,70 +358,24 @@ function PostCard({ post, currentUserId, onDelete, onShare, isActive = false }: 
         )}
       </TouchableOpacity>
 
-      {/* Media ──────────────────────────────────────────────────────────────
-          Reels:  thumbnail poster + play button → opens fullscreen player
-          Photos: double-tap to like (existing behaviour)               */}
-      {post.type === 'reel' ? (
-        /* ── REEL: autoplay when visible, tap → fullscreen player ──────── */
-        <TouchableOpacity
-          activeOpacity={1}
-          onPress={() => router.push({
-            pathname: `/reel/${post.id}` as any,
-            params: { mediaUrl: post.media_url, thumbUrl: post.thumbnail_url ?? '' },
-          })}
-          onLongPress={handleLongPress}
-          delayLongPress={500}
-        >
-          <View style={[styles.postMedia, { height: imageHeight }]}>
-            {/* Poster always visible as base */}
-            {post.thumbnail_url ? (
-              <Image source={{ uri: post.thumbnail_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-            ) : (
-              <View style={[StyleSheet.absoluteFill, styles.reelNoThumb]} />
-            )}
-
-            {/* Inline video — plays muted when this card is in the viewport */}
-            <VideoView
-              player={reelPlayer}
-              style={StyleSheet.absoluteFill}
-              contentFit="cover"
-              nativeControls={false}
-            />
-
-            {/* Pause indicator — shown when reel is visible but manually not playing */}
-            {!isActive && (
-              <View style={styles.reelPlayOverlay} pointerEvents="none">
-                <View style={styles.reelPlayCircle}>
-                  <Ionicons name="play" size={30} color={Colors.white} />
-                </View>
-              </View>
-            )}
-
-            {/* Reel indicator — icon only */}
-            <View style={styles.reelBadge}>
-              <Ionicons name="videocam" size={14} color={Colors.white} />
-            </View>
-          </View>
-        </TouchableOpacity>
-      ) : (
-        <TouchableOpacity
-          activeOpacity={1}
-          onPress={handleDoubleTap}
-          onLongPress={handleLongPress}
-          delayLongPress={500}
-        >
-          <View style={[styles.postMedia, { height: imageHeight }]}>
-            <Image source={{ uri: post.media_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-            {/* Floating heart burst on double tap */}
-            <Animated.View
-              style={[styles.heartBurst, { opacity: heartOpacity, transform: [{ scale: heartScale }] }]}
-              pointerEvents="none"
-            >
-              <Text style={styles.heartBurstIcon}>❤️</Text>
-            </Animated.View>
-          </View>
-        </TouchableOpacity>
-      )}
+      {/* Media — double-tap to like */}
+      <TouchableOpacity
+        activeOpacity={1}
+        onPress={handleDoubleTap}
+        onLongPress={handleLongPress}
+        delayLongPress={500}
+      >
+        <View style={[styles.postMedia, { height: imageHeight }]}>
+          <Image source={{ uri: post.media_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          {/* Floating heart burst on double tap */}
+          <Animated.View
+            style={[styles.heartBurst, { opacity: heartOpacity, transform: [{ scale: heartScale }] }]}
+            pointerEvents="none"
+          >
+            <Text style={styles.heartBurstIcon}>❤️</Text>
+          </Animated.View>
+        </View>
+      </TouchableOpacity>
 
       {/* Actions */}
       <View style={styles.postActions}>
@@ -653,38 +582,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: Colors.surfaceContainerLow,
   },
-  reelNoThumb: {
-    backgroundColor: '#111',
-  },
-  reelPlayOverlay: {
-    ...StyleSheet.absoluteFill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.22)',
-  },
-  reelPlayCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingLeft: 4, // optical centering of play icon
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.7)',
-  },
-  reelBadge: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    borderRadius: BorderRadius.lg,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
   heartBurst: {
     position: 'absolute',
     alignSelf: 'center',
@@ -807,17 +704,12 @@ function ShareModal({ post, userId, onClose }: ShareModalProps) {
     if (sending) return;
     setSending(receiverId);
     const caption = post.caption ? post.caption.slice(0, 80) : '';
-    const isReel = post.type === 'reel';
-    const text = caption
-      ? `${isReel ? '🎬' : '📸'} ${caption}`
-      : isReel ? '🎬 Shared a reel' : '📸 Shared a post';
-    // For reels, send the thumbnail so chat shows an image (not an unrenderable .mp4)
-    const chatMediaUrl = isReel ? (post.thumbnail_url ?? post.media_url) : post.media_url;
+    const text = caption ? `📸 ${caption}` : '📸 Shared a post';
     const { error } = await supabase.from('messages').insert({
       sender_id: userId,
       receiver_id: receiverId,
       text,
-      media_url: chatMediaUrl,
+      media_url: post.media_url,
       post_id: post.id,
     });
     if (error) {

@@ -3,7 +3,7 @@
  *   • Header bar  (back / title / edit)
  *   • Avatar  +  follower stats row
  *   • Display name + bio lines
- *   • Post / Reels / Stories tab bar
+ *   • Post / Stories tab bar
  *   • 3×3 thumbnail grid
  */
 
@@ -56,7 +56,7 @@ export function ProfileSkeleton() {
 
       {/* ── Tab bar ── */}
       <View style={styles.tabBar}>
-        {[0, 1, 2].map(i => (
+        {[0, 1].map(i => (
           <Bone key={i} width={60} height={14} radius={6} />
         ))}
       </View>

@@ -24,7 +24,7 @@ export default function SavedScreen() {
   const { user } = useAuth();
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'posts' | 'reels'>('all');
+  const [filter, setFilter] = useState<'all' | 'posts'>('all');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -47,7 +47,6 @@ export default function SavedScreen() {
 
   const filtered = items.filter((p) => {
     if (filter === 'posts') return p.type === 'picture';
-    if (filter === 'reels') return p.type === 'reel';
     return true;
   });
 
@@ -63,7 +62,7 @@ export default function SavedScreen() {
 
       {/* Filter Pills */}
       <View style={styles.filterRow}>
-        {(['all', 'posts', 'reels'] as const).map((f) => (
+        {(['all', 'posts'] as const).map((f) => (
           <TouchableOpacity
             key={f}
             style={[styles.pill, filter === f && styles.pillActive]}
@@ -103,15 +102,10 @@ export default function SavedScreen() {
               activeOpacity={0.85}
             >
               <Image
-                source={{ uri: item.type === 'reel' ? (item.thumbnail_url ?? item.media_url) : item.media_url }}
+                source={{ uri: item.media_url }}
                 style={styles.cellImage}
                 resizeMode="cover"
               />
-              {item.type === 'reel' && (
-                <View style={styles.reelBadge}>
-                  <Ionicons name="play" size={10} color={Colors.white} />
-                </View>
-              )}
             </TouchableOpacity>
           )}
         />
@@ -179,12 +173,4 @@ const styles = StyleSheet.create({
   row: { gap: 1 },
   cell: { width: GRID_SIZE, height: GRID_SIZE, position: 'relative', overflow: 'hidden' },
   cellImage: { width: '100%', height: '100%' },
-  reelBadge: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    borderRadius: 4,
-    padding: 3,
-  },
 });

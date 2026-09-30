@@ -43,14 +43,14 @@ export type Database = {
         Row: {
           id: string;
           user_id: string;
-          type: 'picture' | 'reel';
+          type: 'picture';
           media_url: string;
           caption: string | null;
           created_at: string;
         };
         Insert: {
           user_id: string;
-          type: 'picture' | 'reel';
+          type: 'picture';
           media_url: string;
           caption?: string | null;
         };

@@ -75,15 +75,10 @@ export default function LikesScreen() {
               activeOpacity={0.85}
             >
               <Image
-                source={{ uri: item.type === 'reel' ? (item.thumbnail_url ?? item.media_url) : item.media_url }}
+                source={{ uri: item.media_url }}
                 style={styles.cellImage}
                 resizeMode="cover"
               />
-              {item.type === 'reel' && (
-                <View style={styles.reelBadge}>
-                  <Ionicons name="play" size={10} color={Colors.white} />
-                </View>
-              )}
             </TouchableOpacity>
           )}
         />
@@ -120,12 +115,4 @@ const styles = StyleSheet.create({
   row: { gap: 1 },
   cell: { width: GRID_SIZE, height: GRID_SIZE, position: 'relative' },
   cellImage: { width: '100%', height: '100%' },
-  reelBadge: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    borderRadius: 4,
-    padding: 3,
-  },
 });
