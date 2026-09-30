@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "scheme": "ofriends",
     "orientation": "portrait",
-    "icon": "./assets/logo.png",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": false,
@@ -15,10 +15,20 @@
       "adaptiveIcon": {
         "backgroundColor": "#131313",
         "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "package": "com.ofriends.app"
+      "package": "com.ofriends.app",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.ACCESS_MEDIA_LOCATION",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -47,10 +57,29 @@
           "isAccessMediaLocationEnabled": true
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#131313",
+          "image": "./assets/splash-logo.png",
+          "imageWidth": 225,
+          "resizeMode": "contain",
+          "dark": {
+            "backgroundColor": "#131313",
+            "image": "./assets/splash-logo.png"
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "5d83f006-7314-4668-9b27-5d630317026e"
+      }
     }
   }
 }
