@@ -55,7 +55,10 @@ export default function TabsLayout() {
       {/* Upload screen — accessible via router.push but hidden from tab bar */}
       <Tabs.Screen
         name="upload"
-        options={{ tabBarButton: () => null }}
+        options={{
+          tabBarButton: () => null,
+          tabBarItemStyle: { display: 'none' },
+        }}
       />
     </Tabs>
   );
