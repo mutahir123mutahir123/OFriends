@@ -9,10 +9,10 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
-  Image,
   Animated,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -26,6 +26,8 @@ type MediaType = 'picture' | 'story';
 type PickedAsset = {
   uri: string;
   fileSize?: number;
+  width: number;
+  height: number;
 };
 
 // ── Upload steps & their progress weights ─────────────────────────────────────
@@ -70,10 +72,17 @@ export default function UploadScreen() {
       return;
     }
 
+    // Stories are shown fullscreen with `contentFit="contain"`, so the picker must
+    // hand back the untouched original. Passing `allowsEditing: true` makes the
+    // picker write a NEW cropped file (a square on iOS, and `aspect` is ignored
+    // there entirely), which permanently discards the edges of the photo.
+    // Posts keep the 4:5 crop because the feed grid expects it.
+    const isStory = mediaType === 'story';
+
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 5],
+      mediaTypes: ['images'],
+      allowsEditing: !isStory,
+      ...(isStory ? {} : { aspect: [4, 5] as [number, number] }),
       quality: 1.0,
     });
 
@@ -82,6 +91,8 @@ export default function UploadScreen() {
       setAsset({
         uri: picked.uri,
         fileSize: picked.fileSize,
+        width: picked.width,
+        height: picked.height,
       });
     }
   };
@@ -125,8 +136,8 @@ export default function UploadScreen() {
       setProgress(0.3);
       const compressed =
         mediaType === 'story'
-          ? await compressStoryImage(asset.uri)
-          : await compressImage(asset.uri);
+          ? await compressStoryImage(asset.uri, asset.width, asset.height)
+          : await compressImage(asset.uri, asset.width, asset.height);
       setStepLabel('Uploading…');
       setProgress(0.7);
       const mediaUrl = await uploadFile(compressed, `${base}.jpg`, 'image/jpeg', token);
@@ -195,10 +206,31 @@ export default function UploadScreen() {
       </View>
 
       {/* Media Picker */}
-      <TouchableOpacity style={styles.mediaPicker} onPress={pickMedia} disabled={uploading}>
+      <TouchableOpacity
+        style={[styles.mediaPicker, mediaType === 'story' && styles.mediaPickerStory]}
+        onPress={pickMedia}
+        disabled={uploading}
+      >
         {previewUri ? (
           <>
-            <Image source={{ uri: previewUri }} style={styles.mediaPreview} resizeMode="cover" />
+            {mediaType === 'story' ? (
+              <View style={styles.storyPreviewWrapper}>
+                <Image
+                  source={{ uri: previewUri }}
+                  style={StyleSheet.absoluteFill}
+                  contentFit="cover"
+                  blurRadius={40}
+                />
+                <View style={styles.storyPreviewScrim} pointerEvents="none" />
+                <Image
+                  source={{ uri: previewUri }}
+                  style={StyleSheet.absoluteFill}
+                  contentFit="contain"
+                />
+              </View>
+            ) : (
+              <Image source={{ uri: previewUri }} style={styles.mediaPreview} contentFit="cover" />
+            )}
             {asset?.fileSize ? (
               <View style={styles.sizeBadge}>
                 <Text style={styles.sizeBadgeText}>{formatBytes(asset.fileSize)}</Text>
@@ -317,7 +349,19 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surfaceContainerLow,
     marginBottom: Spacing.lg,
   },
+  mediaPickerStory: { aspectRatio: 9 / 16, backgroundColor: '#000' },
   mediaPreview: { width: '100%', height: '100%' },
+  // Mirrors the story viewer (blurred fill + contained photo) so what you
+  // approve here is what other people actually see.
+  storyPreviewWrapper: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: '#000',
+    overflow: 'hidden',
+  },
+  storyPreviewScrim: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
   sizeBadge: {
     position: 'absolute',
     bottom: Spacing.sm,

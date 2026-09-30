@@ -117,7 +117,7 @@ export default function ProfileScreen() {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8,
@@ -126,8 +126,8 @@ export default function ProfileScreen() {
 
     setLoading(true);
     try {
-      const rawUri = result.assets[0].uri;
-      const compressedUri = await compressImage(rawUri);
+      const picked = result.assets[0];
+      const compressedUri = await compressImage(picked.uri, picked.width, picked.height);
       const fileName = `${user.id}/avatar_${Date.now()}.jpg`;
 
       // Upload using FileSystem.uploadAsync natively (fixes react native blob issues)
