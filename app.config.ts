@@ -38,14 +38,20 @@ function describeHowToFix(missing: string[]): string {
 }
 
 export default ({ config }: ConfigContext): ExpoConfig => {
+  const isBuildContext =
+    process.env.EAS_BUILD === 'true' ||
+    process.env.EXPO_BUILD_ENV === 'true' ||
+    process.env.CI === 'true';
+
   const missing = REQUIRED_ENV.filter((name) => (process.env[name] ?? '').trim() === '');
 
-  if (missing.length > 0) {
+  if (isBuildContext && missing.length > 0) {
     throw new Error(describeHowToFix([...missing]));
   }
 
-  const url = process.env.EXPO_PUBLIC_SUPABASE_URL!.trim();
-  if (!/^https?:\/\/\S+$/.test(url)) {
+  // Still validate format if present (useful for local dev/builds)
+  const url = process.env.EXPO_PUBLIC_SUPABASE_URL?.trim();
+  if (url && !/^https?:\/\/\S+$/.test(url)) {
     throw new Error(
       `EXPO_PUBLIC_SUPABASE_URL is not a valid URL (got ${JSON.stringify(url)}). ` +
         'Check the value for stray quotes or trailing whitespace in EAS.'
