@@ -1,25 +1,56 @@
 {
   "expo": {
-    "name": "loop",
+    "name": "Loop",
     "slug": "loop",
     "version": "1.0.0",
+    "scheme": "loop",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "icon": "./assets/logo.png",
+    "userInterfaceStyle": "dark",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": false,
+      "bundleIdentifier": "com.loop.app"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#131313",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "package": "com.loop.app"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "This app needs access to your photos to let you share moments.",
+          "cameraPermission": "This app needs camera access to capture moments."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Loop to access your camera to share Instants with friends."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow Loop to save Instants to your camera roll.",
+          "savePhotosPermission": "Allow Loop to save Instants to your camera roll.",
+          "isAccessMediaLocationEnabled": true
+        }
+      ],
+      "expo-asset"
+    ],
+    "experiments": {
+      "typedRoutes": true
     }
   }
 }
