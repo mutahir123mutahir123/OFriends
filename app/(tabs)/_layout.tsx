@@ -1,23 +1,61 @@
+import { useEffect, useRef, useState } from 'react';
 import { Tabs } from 'expo-router';
-import { View, StyleSheet, Platform } from 'react-native';
+import { View, StyleSheet, Platform, Animated, type ColorValue } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/lib/theme';
+import { Spring } from '@/lib/motion';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
 type TabConfig = {
   name: string;
+  label: string;
   icon: IoniconName;
   iconFilled: IoniconName;
 };
 
 const TABS: TabConfig[] = [
-  { name: 'index',    icon: 'home-outline',       iconFilled: 'home'           },
-  { name: 'search',   icon: 'search-outline',     iconFilled: 'search'         },
-  { name: 'messages', icon: 'chatbubble-outline',  iconFilled: 'chatbubble'    },
-  { name: 'profile',  icon: 'person-outline',      iconFilled: 'person'        },
+  { name: 'index',    label: 'Home',    icon: 'home-outline',      iconFilled: 'home'        },
+  { name: 'search',   label: 'Search',  icon: 'search-outline',    iconFilled: 'search'      },
+  { name: 'messages', label: 'Messages',icon: 'chatbubble-outline',iconFilled: 'chatbubble' },
+  { name: 'profile',  label: 'Profile', icon: 'person-outline',    iconFilled: 'person'      },
 ];
+
+type TabBarIconProps = { focused: boolean; color: ColorValue; size: number };
+
+/** Builds a stable per-tab icon component that pops slightly when it becomes active. */
+function createTabIcon({ icon, iconFilled }: TabConfig) {
+  return function TabIcon({ focused, color }: TabBarIconProps) {
+    const [scale] = useState(() => new Animated.Value(1));
+    const wasFocused = useRef(focused);
+
+    useEffect(() => {
+      if (focused === wasFocused.current) return;
+      wasFocused.current = focused;
+      Animated.spring(scale, {
+        toValue: focused ? 1.15 : 1,
+        ...Spring.gentle,
+        useNativeDriver: true,
+      }).start();
+    }, [focused, scale]);
+
+    return (
+      <Animated.View style={{ transform: [{ scale }] }}>
+        <Ionicons
+          name={focused ? iconFilled : icon}
+          size={26}
+          color={color}
+          style={focused ? styles.activeGlow : undefined}
+        />
+      </Animated.View>
+    );
+  };
+}
+
+// Created once at module scope so tab icon components keep a stable identity
+// and their animation state survives re-renders.
+const TAB_SCREENS = TABS.map((tab) => ({ ...tab, TabIcon: createTabIcon(tab) }));
 
 export default function TabsLayout() {
   return (
@@ -36,19 +74,13 @@ export default function TabsLayout() {
           ),
       }}
     >
-      {TABS.map(({ name, icon, iconFilled }) => (
+      {TAB_SCREENS.map(({ name, label, TabIcon }) => (
         <Tabs.Screen
           key={name}
           name={name}
           options={{
-            tabBarIcon: ({ focused, color }) => (
-              <Ionicons
-                name={focused ? iconFilled : icon}
-                size={26}
-                color={color}
-                style={focused ? styles.activeGlow : undefined}
-              />
-            ),
+            tabBarIcon: TabIcon,
+            tabBarAccessibilityLabel: label,
           }}
         />
       ))}

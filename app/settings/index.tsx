@@ -1,21 +1,26 @@
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Platform, Alert } from 'react-native';
+import { useState } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  Platform,
+  Animated,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, FontFamily, FontSize, Spacing, BorderRadius } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
+import { PostOptionsSheet } from '@/components/PostOptionsSheet';
+import { Spring } from '@/lib/motion';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
 export default function SettingsScreen() {
   const router = useRouter();
   const { signOut } = useAuth();
-
-  const handleSignOut = () => {
-    Alert.alert('Sign out?', 'You will be signed out of your account.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign Out', style: 'destructive', onPress: signOut },
-    ]);
-  };
+  const [signOutVisible, setSignOutVisible] = useState(false);
 
   return (
     <View style={styles.container}>
@@ -29,8 +34,8 @@ export default function SettingsScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-        {/* Section: How you use Loop */}
-        <Text style={styles.sectionLabel}>How you use Loop</Text>
+        {/* Section: How you use OFriends */}
+        <Text style={styles.sectionLabel}>How you use OFriends</Text>
         <View style={styles.section}>
           <MenuItem
             icon="bookmark-outline"
@@ -56,20 +61,55 @@ export default function SettingsScreen() {
         </View>
 
         {/* Sign Out */}
-        <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut} activeOpacity={0.75}>
+        <TouchableOpacity
+          style={styles.signOutBtn}
+          onPress={() => setSignOutVisible(true)}
+          activeOpacity={0.75}
+          accessibilityRole="button"
+          accessibilityLabel="Sign out"
+        >
           <Text style={styles.signOutText}>Sign Out</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {signOutVisible && (
+        <PostOptionsSheet
+          visible={signOutVisible}
+          onClose={() => setSignOutVisible(false)}
+          options={[
+            { label: 'Sign out', icon: 'log-out-outline', destructive: true, onPress: () => {} },
+          ]}
+          confirm={{
+            title: 'Sign out?',
+            body: 'You’ll need to sign in again to post, like, and message.',
+            confirmLabel: 'Sign out',
+            onConfirm: signOut,
+          }}
+        />
+      )}
     </View>
   );
 }
 
 function MenuItem({ icon, label, onPress }: { icon: IoniconName; label: string; onPress: () => void }) {
+  const [press] = useState(() => new Animated.Value(1));
+
+  const animate = (to: number) =>
+    Animated.spring(press, { toValue: to, ...Spring.gentle, useNativeDriver: true }).start();
+
   return (
-    <TouchableOpacity style={styles.menuItem} onPress={onPress} activeOpacity={0.7}>
-      <Ionicons name={icon} size={22} color={Colors.onSurface} style={styles.menuIcon} />
-      <Text style={styles.menuLabel}>{label}</Text>
-      <Ionicons name="chevron-forward" size={18} color={Colors.onSurfaceVariant} />
+    <TouchableOpacity
+      style={styles.menuItem}
+      onPressIn={() => animate(0.97)}
+      onPressOut={() => animate(1)}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <Animated.View style={[styles.menuRowInner, { transform: [{ scale: press }] }]}>
+        <Ionicons name={icon} size={22} color={Colors.onSurface} style={styles.menuIcon} />
+        <Text style={styles.menuLabel}>{label}</Text>
+        <Ionicons name="chevron-forward" size={18} color={Colors.onSurfaceVariant} />
+      </Animated.View>
     </TouchableOpacity>
   );
 }
@@ -114,6 +154,10 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   menuItem: {
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+  },
+  menuRowInner: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: Spacing.md,

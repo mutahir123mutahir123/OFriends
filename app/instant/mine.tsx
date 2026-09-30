@@ -1,9 +1,9 @@
 /**
- * "Your Instants" — /instant/mine
+ * "Your Instants" â€” /instant/mine
  *
  * Shows every instant the current user has ever posted, grouped by
  * "Today" / "This week" / "Earlier".  Each thumbnail shows how many
- * friends have viewed it (❤️ N).  Camera button in the header lets
+ * friends have viewed it (â¤ï¸ N).  Camera button in the header lets
  * the user post a new instant.
  *
  * Subtitle: "This is only visible to you"
@@ -20,7 +20,6 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
-  Modal,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -29,9 +28,10 @@ import * as MediaLibrary from 'expo-media-library';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
+import { PostOptionsSheet } from '@/components/PostOptionsSheet';
 import { Colors, FontFamily, FontSize, Spacing, BorderRadius } from '@/lib/theme';
 
-/* ── Layout constants ──────────────────────────────────── */
+/* â”€â”€ Layout constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 const SCREEN_W = Dimensions.get('window').width;
 const H_PAD    = Spacing.lg;          // horizontal page padding
 const GAP      = 6;                   // gap between thumbnails
@@ -39,7 +39,7 @@ const COLS     = 3;
 const THUMB_W  = (SCREEN_W - H_PAD * 2 - GAP * (COLS - 1)) / COLS;
 const THUMB_R  = THUMB_W * 0.2;       // squircle radius
 
-/* ── Types ──────────────────────────────────────────────── */
+/* â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 type InstantRow = {
   id: string;
   media_url: string;
@@ -54,7 +54,7 @@ type Sections = {
   earlier:  InstantRow[];
 };
 
-/* ── Helpers ────────────────────────────────────────────── */
+/* â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function groupByPeriod(rows: InstantRow[]): Sections {
   const now   = new Date();
   const sod   = new Date(now); sod.setHours(0, 0, 0, 0);       // start of today
@@ -84,7 +84,7 @@ type SectionProps = {
   onLongPress: (item: InstantRow) => void;
 };
 
-/* ── Thumbnail ─────────────────────────────────────────── */
+/* â”€â”€ Thumbnail â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function Thumb({ item, onOpen, onLongPress }: { item: InstantRow } & Omit<SectionProps, 'title' | 'rows'>) {
   return (
     <TouchableOpacity
@@ -104,10 +104,10 @@ function Thumb({ item, onOpen, onLongPress }: { item: InstantRow } & Omit<Sectio
       {/* Expired dim overlay */}
       {!isActive(item) && <View style={styles.expiredOverlay} />}
 
-      {/* View count badge — top right */}
+      {/* View count badge â€” top right */}
       {item.viewCount > 0 && (
         <View style={styles.badge}>
-          <Text style={styles.badgeEmoji}>❤️</Text>
+          <Text style={styles.badgeEmoji}>â¤ï¸</Text>
           <Text style={styles.badgeCount}>{item.viewCount}</Text>
         </View>
       )}
@@ -118,7 +118,7 @@ function Thumb({ item, onOpen, onLongPress }: { item: InstantRow } & Omit<Sectio
   );
 }
 
-/* ── Section block ─────────────────────────────────────── */
+/* â”€â”€ Section block â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 function Section({ title, rows, onOpen, onLongPress }: SectionProps) {
   if (rows.length === 0) return null;
   // Chunk into rows of 3
@@ -146,9 +146,9 @@ function Section({ title, rows, onOpen, onLongPress }: SectionProps) {
   );
 }
 
-/* ══════════════════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    Screen
-══════════════════════════════════════════════════════════ */
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 export default function MyInstantsScreen() {
   const { user } = useAuth();
   const router   = useRouter();
@@ -157,9 +157,8 @@ export default function MyInstantsScreen() {
   const [loading,  setLoading]  = useState(true);
   const [total,    setTotal]    = useState(0);
   const [actionItem, setActionItem] = useState<InstantRow | null>(null);
-  const [saving, setSaving] = useState(false);
 
-  /* ── Fetch ─────────────────────────────────────────────── */
+  /* â”€â”€ Fetch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   const load = useCallback(async () => {
     if (!user) return;
     setLoading(true);
@@ -206,9 +205,8 @@ export default function MyInstantsScreen() {
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  /* ── Save instant to camera roll ───────────────────────── */
+  /* â”€â”€ Save instant to camera roll â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   const saveToRoll = useCallback(async (item: InstantRow) => {
-    setSaving(true);
     try {
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== 'granted') {
@@ -222,12 +220,11 @@ export default function MyInstantsScreen() {
     } catch {
       Alert.alert('Error', 'Could not save image. Please try again.');
     } finally {
-      setSaving(false);
       setActionItem(null);
     }
   }, []);
 
-  /* ── Delete a single instant ────────────────────────────── */
+  /* â”€â”€ Delete a single instant â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   const deleteInstant = useCallback(async (id: string) => {
     setActionItem(null);
     await supabase.from('instants').delete().eq('id', id);
@@ -244,11 +241,11 @@ export default function MyInstantsScreen() {
 
   const hasAny = total > 0;
 
-  /* ── Render ────────────────────────────────────────────── */
+  /* â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
   return (
     <View style={styles.container}>
 
-      {/* ── Header ── */}
+      {/* â”€â”€ Header â”€â”€ */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.headerSideBtn} hitSlop={12}>
           <Ionicons name="chevron-back" size={26} color={Colors.onSurface} />
@@ -259,7 +256,7 @@ export default function MyInstantsScreen() {
           <Text style={styles.headerSub}>Only visible to you</Text>
         </View>
 
-        {/* Camera button — post a new instant */}
+        {/* Camera button â€” post a new instant */}
         <TouchableOpacity
           style={styles.headerSideBtn}
           onPress={() => router.push('/instant/camera' as any)}
@@ -269,7 +266,7 @@ export default function MyInstantsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* ── Body ── */}
+      {/* â”€â”€ Body â”€â”€ */}
       {loading ? (
         <View style={styles.centered}>
           <ActivityIndicator color={Colors.primary} size="large" />
@@ -304,7 +301,7 @@ export default function MyInstantsScreen() {
         </ScrollView>
       )}
 
-      {/* ── "Create recap" floating button (only when content exists) ── */}
+      {/* â”€â”€ "Create recap" floating button (only when content exists) â”€â”€ */}
       {hasAny && !loading && (
         <View style={styles.fabRow}>
           <TouchableOpacity
@@ -318,67 +315,34 @@ export default function MyInstantsScreen() {
         </View>
       )}
 
-      {/* ── Action sheet modal (long-press on thumbnail) ── */}
-      <Modal
-        visible={!!actionItem}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setActionItem(null)}
-      >
-        <TouchableOpacity
-          style={styles.sheetBackdrop}
-          activeOpacity={1}
-          onPress={() => setActionItem(null)}
+      {/* â”€â”€ Action sheet (long-press on thumbnail) â”€â”€ */}
+      {actionItem && (
+        <PostOptionsSheet
+          visible={!!actionItem}
+          onClose={() => setActionItem(null)}
+          title="Instant"
+          options={[
+            {
+              label: 'Save to camera roll',
+              icon: 'download-outline',
+              onPress: () => void saveToRoll(actionItem),
+            },
+            { label: 'Delete instant', icon: 'trash-outline', destructive: true, onPress: () => {} },
+          ]}
+          confirm={{
+            title: 'Delete this instant?',
+            body: 'Friends who havenâ€™t seen it wonâ€™t be able to view it.',
+            confirmLabel: 'Delete',
+            onConfirm: () => deleteInstant(actionItem.id),
+          }}
         />
-        <View style={styles.sheet}>
-          <View style={styles.sheetHandle} />
-
-          <TouchableOpacity
-            style={styles.sheetRow}
-            onPress={() => actionItem && saveToRoll(actionItem)}
-            disabled={saving}
-          >
-            <View style={styles.sheetIconWrap}>
-              <Ionicons name="download-outline" size={22} color={Colors.onSurface} />
-            </View>
-            <Text style={styles.sheetRowText}>
-              {saving ? 'Saving…' : 'Save to camera roll'}
-            </Text>
-          </TouchableOpacity>
-
-          <View style={styles.sheetDivider} />
-
-          <TouchableOpacity
-            style={styles.sheetRow}
-            onPress={() => actionItem && Alert.alert(
-              'Delete Instant',
-              'Remove this instant? Friends who haven\'t seen it won\'t be able to view it.',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Delete', style: 'destructive', onPress: () => deleteInstant(actionItem.id) },
-              ]
-            )}
-          >
-            <View style={[styles.sheetIconWrap, styles.sheetIconDelete]}>
-              <Ionicons name="trash-outline" size={22} color="#ff3b6f" />
-            </View>
-            <Text style={[styles.sheetRowText, styles.sheetRowDelete]}>Delete instant</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.sheetRow, styles.sheetCancel]}
-            onPress={() => setActionItem(null)}
-          >
-            <Text style={styles.sheetCancelText}>Cancel</Text>
-          </TouchableOpacity>
-        </View>
-      </Modal>
+      )}
 
     </View>
   );
 }
 
-/* ── Styles ─────────────────────────────────────────────── */
+/* â”€â”€ Styles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -534,68 +498,6 @@ const styles = StyleSheet.create({
     color: Colors.white,
   },
 
-  /* Action sheet */
-  sheetBackdrop: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-  },
-  sheet: {
-    position: 'absolute',
-    bottom: 0, left: 0, right: 0,
-    backgroundColor: Colors.surfaceContainerHigh,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingBottom: Platform.OS === 'ios' ? 36 : 20,
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
-  },
-  sheetHandle: {
-    alignSelf: 'center',
-    width: 40, height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.20)',
-    marginBottom: Spacing.lg,
-  },
-  sheetRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-    paddingVertical: 15,
-  },
-  sheetIconWrap: {
-    width: 40, height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.surfaceContainerHighest,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sheetIconDelete: {
-    backgroundColor: 'rgba(255,59,111,0.12)',
-  },
-  sheetRowText: {
-    fontFamily: FontFamily.semiBold,
-    fontSize: FontSize.bodyMd,
-    color: Colors.onSurface,
-  },
-  sheetRowDelete: { color: '#ff3b6f' },
-  sheetDivider: {
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    marginVertical: 4,
-  },
-  sheetCancel: {
-    justifyContent: 'center',
-    marginTop: Spacing.sm,
-    paddingVertical: 14,
-    backgroundColor: Colors.surfaceContainerHighest,
-    borderRadius: BorderRadius.xl,
-  },
-  sheetCancelText: {
-    fontFamily: FontFamily.bold,
-    fontSize: FontSize.bodyMd,
-    color: Colors.onSurface,
-    textAlign: 'center',
-  },
 
   /* FAB */
   fabRow: {

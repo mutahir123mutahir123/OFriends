@@ -94,7 +94,7 @@ export default function ForgotPasswordScreen() {
     const exists = await checkEmailExists(trimmed);
     if (!exists) {
       setLoading(false);
-      Alert.alert('Email not found', 'No Loop account found with that email address.');
+      Alert.alert('Email not found', 'No OFriends account found with that email address.');
       return;
     }
 
@@ -215,7 +215,7 @@ export default function ForgotPasswordScreen() {
         {step === 'email' && (
           <View style={styles.form}>
             <Text style={styles.instruction}>
-              Enter the email address linked to your Loop account and we’ll send you a verification code.
+              Enter the email address linked to your OFriends account and we’ll send you a verification code.
             </Text>
 
             <View style={styles.inputWrapper}>

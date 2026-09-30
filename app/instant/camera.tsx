@@ -111,7 +111,7 @@ export default function InstantCameraScreen() {
         <Ionicons name="camera-outline" size={56} color={Colors.primary} />
         <Text style={styles.permTitle}>Camera Access Needed</Text>
         <Text style={styles.permBody}>
-          Loop needs camera access so you can share Instants with your friends.
+          OFriends needs camera access so you can share Instants with your friends.
         </Text>
         <TouchableOpacity onPress={requestPermission} activeOpacity={0.85}>
           <LinearGradient

@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
+import { PostOptionsSheet } from '@/components/PostOptionsSheet';
 import { formatRelativeTime } from '@/lib/helpers';
 import { Colors, FontFamily, FontSize, Spacing, BorderRadius } from '@/lib/theme';
 
@@ -22,6 +23,7 @@ export default function CommentsScreen() {
   const { user } = useAuth();
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -40,19 +42,10 @@ export default function CommentsScreen() {
     })();
   }, [user, load]);
 
-  const deleteComment = (commentId: string) => {
-    Alert.alert('Delete Comment', 'Remove this comment?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          const { error } = await supabase.from('comments').delete().eq('id', commentId);
-          if (error) Alert.alert('Error', error.message);
-          else setItems((prev) => prev.filter((c) => c.id !== commentId));
-        },
-      },
-    ]);
+  const deleteComment = async (commentId: string) => {
+    const { error } = await supabase.from('comments').delete().eq('id', commentId);
+    if (error) Alert.alert('Error', error.message);
+    else setItems((prev) => prev.filter((c) => c.id !== commentId));
   };
 
   return (
@@ -95,14 +88,33 @@ export default function CommentsScreen() {
                 <Text style={styles.commentTime}>{formatRelativeTime(item.created_at)}</Text>
               </View>
               <TouchableOpacity
-                onPress={() => deleteComment(item.id)}
+                onPress={() => setDeleting(item.id)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                activeOpacity={0.6}
+                accessibilityRole="button"
+                accessibilityLabel="Delete comment"
               >
                 <Ionicons name="trash-outline" size={18} color={Colors.error} />
               </TouchableOpacity>
             </TouchableOpacity>
           )}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
+        />
+      )}
+
+      {deleting && (
+        <PostOptionsSheet
+          visible={!!deleting}
+          onClose={() => setDeleting(null)}
+          options={[
+            { label: 'Delete comment', icon: 'trash-outline', destructive: true, onPress: () => {} },
+          ]}
+          confirm={{
+            title: 'Delete this comment?',
+            body: 'This can’t be undone.',
+            confirmLabel: 'Delete',
+            onConfirm: () => deleteComment(deleting),
+          }}
         />
       )}
     </View>

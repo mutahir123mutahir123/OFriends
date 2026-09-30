@@ -26,7 +26,9 @@ import { useAuth } from '@/lib/auth';
 import { StoryRing } from '@/components/StoryRing';
 import { Avatar } from '@/components/Avatar';
 import { ProfileSkeleton } from '@/components/skeletons/ProfileSkeleton';
+import { PostOptionsSheet } from '@/components/PostOptionsSheet';
 import { Colors, FontFamily, FontSize, Spacing, BorderRadius } from '@/lib/theme';
+import { Duration, Curves } from '@/lib/motion';
 import { formatCount } from '@/lib/helpers';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -44,23 +46,45 @@ export default function ProfileScreen() {
   // Create sheet state
   const [createSheetVisible, setCreateSheetVisible] = useState(false);
   const [sheetAnim] = useState(() => new Animated.Value(400));
+  const [createBackdrop] = useState(() => new Animated.Value(0));
+
+  // Delete options sheet state
+  const [deleting, setDeleting] = useState<{ id: string; type: 'post' | 'story' } | null>(null);
 
   const openCreateSheet = () => {
     setCreateSheetVisible(true);
-    Animated.spring(sheetAnim, {
-      toValue: 0,
-      useNativeDriver: true,
-      bounciness: 0,
-      speed: 16,
-    }).start();
+    createBackdrop.setValue(0);
+    Animated.parallel([
+      Animated.timing(createBackdrop, {
+        toValue: 1,
+        duration: Duration.fast,
+        easing: Curves.standard,
+        useNativeDriver: true,
+      }),
+      Animated.spring(sheetAnim, {
+        toValue: 0,
+        useNativeDriver: true,
+        bounciness: 0,
+        speed: 16,
+      }),
+    ]).start();
   };
 
   const closeCreateSheet = (cb?: () => void) => {
-    Animated.timing(sheetAnim, {
-      toValue: 400,
-      duration: 220,
-      useNativeDriver: true,
-    }).start(() => {
+    Animated.parallel([
+      Animated.timing(createBackdrop, {
+        toValue: 0,
+        duration: Duration.instant,
+        easing: Curves.exit,
+        useNativeDriver: true,
+      }),
+      Animated.timing(sheetAnim, {
+        toValue: 400,
+        duration: Duration.fast,
+        easing: Curves.exit,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
       setCreateSheetVisible(false);
       cb?.();
     });
@@ -208,38 +232,24 @@ export default function ProfileScreen() {
   };
 
   const deletePost = async (postId: string) => {
-    Alert.alert('Delete Post', 'This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete', style: 'destructive', onPress: async () => {
-          const { error } = await supabase.from('posts').delete().eq('id', postId);
-          if (error) {
-            Alert.alert('Error', error.message);
-          } else {
-            // Optimistic: remove from local list and decrement count immediately
-            setPosts((prev) => prev.filter((p) => p.id !== postId));
-            setCounts((prev) => ({ ...prev, posts: Math.max(0, prev.posts - 1) }));
-          }
-        },
-      },
-    ]);
+    const { error } = await supabase.from('posts').delete().eq('id', postId);
+    if (error) {
+      Alert.alert('Error', error.message);
+      return;
+    }
+    // Optimistic: remove from local list and decrement count immediately
+    setPosts((prev) => prev.filter((p) => p.id !== postId));
+    setCounts((prev) => ({ ...prev, posts: Math.max(0, prev.posts - 1) }));
   };
 
   const deleteStory = async (storyId: string) => {
-    Alert.alert('Delete Story', 'This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete', style: 'destructive', onPress: async () => {
-          const { error } = await supabase.from('stories').delete().eq('id', storyId);
-          if (error) {
-            Alert.alert('Error', error.message);
-          } else {
-            // Optimistic: remove from merged posts list immediately
-            setPosts((prev) => prev.filter((p) => p.id !== storyId));
-          }
-        },
-      },
-    ]);
+    const { error } = await supabase.from('stories').delete().eq('id', storyId);
+    if (error) {
+      Alert.alert('Error', error.message);
+      return;
+    }
+    // Optimistic: remove from merged posts list immediately
+    setPosts((prev) => prev.filter((p) => p.id !== storyId));
   };
 
   const filteredPosts = posts.filter((p) => p.type === 'picture');
@@ -351,12 +361,17 @@ export default function ProfileScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.deleteBadge}
-              onPress={() =>
-                tab === 'stories' ? deleteStory(post.id) : deletePost(post.id)
-              }
+              onPress={() => setDeleting({ id: post.id, type: tab === 'stories' ? 'story' : 'post' })}
+              hitSlop={8}
               activeOpacity={0.6}
+              accessibilityRole="button"
+              accessibilityLabel="Delete"
             >
-              <Text style={styles.deleteBadgeText}>⋯</Text>
+              <Ionicons
+                name="trash-outline"
+                size={16}
+                color={Colors.onSurface}
+              />
             </TouchableOpacity>
           </View>
         ))}
@@ -446,7 +461,19 @@ export default function ProfileScreen() {
         statusBarTranslucent
       >
         <View style={styles.createModalBg}>
-          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => closeCreateSheet()} />
+          <Animated.View
+            style={[
+              StyleSheet.absoluteFill,
+              styles.createBackdropLayer,
+              { opacity: createBackdrop },
+            ]}
+          >
+            <TouchableOpacity
+              style={StyleSheet.absoluteFill}
+              activeOpacity={1}
+              onPress={() => closeCreateSheet()}
+            />
+          </Animated.View>
           <Animated.View style={[styles.createSheet, { transform: [{ translateY: sheetAnim }] }]}>
             <View style={styles.createHandle} />
             <Text style={styles.createTitle}>Create</Text>
@@ -473,6 +500,29 @@ export default function ProfileScreen() {
           </Animated.View>
         </View>
       </Modal>
+
+      {/* Delete options sheet */}
+      {deleting && (
+        <PostOptionsSheet
+          visible={!!deleting}
+          onClose={() => setDeleting(null)}
+          options={[
+            {
+              label: deleting.type === 'story' ? 'Delete story' : 'Delete post',
+              icon: 'trash-outline',
+              destructive: true,
+              onPress: () => { void 0; },
+            },
+          ]}
+          confirm={{
+            title: deleting.type === 'story' ? 'Delete this story?' : 'Delete this post?',
+            body: "This can't be undone.",
+            confirmLabel: 'Delete',
+            onConfirm: () =>
+              deleting.type === 'story' ? deleteStory(deleting.id) : deletePost(deleting.id),
+          }}
+        />
+      )}
     </ScrollView>
   );
 }
@@ -698,21 +748,17 @@ const styles = StyleSheet.create({
     zIndex: 10,
     backgroundColor: 'rgba(0,0,0,0.45)',
     borderRadius: 10,
-    width: 20,
-    height: 20,
+    width: 24,
+    height: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  deleteBadgeText: {
-    color: '#fff',
-    fontSize: 14,
-    lineHeight: 18,
-  },
 
   // Create sheet
+  createBackdropLayer: { backgroundColor: 'rgba(0,0,0,0.6)' },
   createModalBg: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'transparent',
     justifyContent: 'flex-end',
   },
   createSheet: {

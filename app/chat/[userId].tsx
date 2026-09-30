@@ -12,6 +12,7 @@ import {
   Alert,
   Image,
   Dimensions,
+  Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -19,7 +20,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 import { Avatar } from '@/components/Avatar';
+import { PostOptionsSheet } from '@/components/PostOptionsSheet';
 import { Colors, FontFamily, FontSize, Spacing, BorderRadius } from '@/lib/theme';
+import { Duration, Curves, Spring } from '@/lib/motion';
 
 /** Returns an ISO timestamp 24 hours ago — the expiry cutoff. */
 const get24hCutoff = () =>
@@ -33,6 +36,8 @@ export default function ChatScreen() {
   const [partner, setPartner] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [inputText, setInputText] = useState('');
+  const [deleteVisible, setDeleteVisible] = useState(false);
+  const [sendPop] = useState(() => new Animated.Value(1));
   const flatListRef = useRef<FlatList>(null);
   const IMAGE_WIDTH = Dimensions.get('window').width * 0.55;
 
@@ -97,30 +102,28 @@ export default function ChatScreen() {
     return () => clearInterval(timer);
   }, []);
 
-  const deleteChat = () => {
+  const deleteChat = async () => {
     if (!user || !userId) return;
-    Alert.alert('Delete Chat', 'This will delete the entire conversation for both users. This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete', style: 'destructive', onPress: async () => {
-          const { error } = await supabase
-            .from('messages')
-            .delete()
-            .or(`and(sender_id.eq.${user.id},receiver_id.eq.${userId}),and(sender_id.eq.${userId},receiver_id.eq.${user.id})`);
-          if (error) {
-            Alert.alert('Error', error.message);
-          } else {
-            router.back();
-          }
-        },
-      },
-    ]);
+    const { error } = await supabase
+      .from('messages')
+      .delete()
+      .or(`and(sender_id.eq.${user.id},receiver_id.eq.${userId}),and(sender_id.eq.${userId},receiver_id.eq.${user.id})`);
+    if (error) {
+      Alert.alert('Error', error.message);
+      return;
+    }
+    router.back();
   };
 
   const sendMessage = async () => {
     if (!inputText.trim() || !user || !userId) return;
     const text = inputText.trim();
     setInputText('');
+    sendPop.setValue(1);
+    Animated.sequence([
+      Animated.spring(sendPop, { toValue: 1.2, ...Spring.pop, useNativeDriver: true }),
+      Animated.spring(sendPop, { toValue: 1, ...Spring.pop, useNativeDriver: true }),
+    ]).start();
     const { error } = await supabase.from('messages').insert({ sender_id: user.id, receiver_id: userId, text });
     if (error) {
       setInputText(text);
@@ -142,8 +145,15 @@ export default function ChatScreen() {
           </TouchableOpacity>
           <Avatar uri={partner?.avatar_url} name={partner?.username ?? '?'} size={36} />
           <Text style={styles.partnerName}>{partner?.username ?? ''}</Text>
-          <TouchableOpacity onPress={deleteChat} style={styles.deleteBtn}>
-            <Text style={styles.deleteIcon}>🗑</Text>
+          <TouchableOpacity
+            onPress={() => setDeleteVisible(true)}
+            style={styles.deleteBtn}
+            hitSlop={10}
+            activeOpacity={0.6}
+            accessibilityRole="button"
+            accessibilityLabel="Delete chat"
+          >
+            <Ionicons name="trash-outline" size={20} color={Colors.onSurface} />
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -171,37 +181,7 @@ export default function ChatScreen() {
           const isMe = item.sender_id === user?.id;
           const hasMedia = !!item.media_url;
           return (
-            <View style={[styles.bubbleRow, isMe ? styles.bubbleRowMe : styles.bubbleRowThem]}>
-              <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleThem, hasMedia && { paddingHorizontal: 0, paddingVertical: 0, overflow: 'hidden', maxWidth: '70%' }]}>
-                {hasMedia ? (
-                  <>
-                    <View>
-                      <Image
-                        source={{ uri: item.media_url }}
-                        style={{ width: IMAGE_WIDTH, height: IMAGE_WIDTH * 1.25, borderRadius: 12 }}
-                        resizeMode="cover"
-                      />
-                    </View>
-                    {item.text ? (
-                      <Text style={[styles.bubbleText, isMe ? styles.bubbleTextMe : styles.bubbleTextThem, { paddingHorizontal: 10, paddingVertical: 6 }]}>
-                        {item.text}
-                      </Text>
-                    ) : null}
-                    <TouchableOpacity
-                      style={styles.viewPostBtn}
-                      onPress={() => router.push(`/post/${item.post_id}` as any)}
-                    >
-                      <Ionicons name="eye-outline" size={14} color={Colors.white} />
-                      <Text style={styles.viewPostText}>View Post</Text>
-                    </TouchableOpacity>
-                  </>
-                ) : (
-                  <Text style={[styles.bubbleText, isMe ? styles.bubbleTextMe : styles.bubbleTextThem]}>
-                    {item.text}
-                  </Text>
-                )}
-              </View>
-            </View>
+            <MessageBubble item={item} isMe={isMe} hasMedia={hasMedia} imageWidth={IMAGE_WIDTH} />
           );
         }}
       />
@@ -218,11 +198,102 @@ export default function ChatScreen() {
           maxLength={500}
           selectionColor={Colors.primary}
         />
-        <TouchableOpacity onPress={sendMessage} disabled={!inputText.trim()}>
-          <Text style={[styles.sendBtn, !inputText.trim() && styles.sendBtnDisabled]}>Send</Text>
+        <TouchableOpacity onPress={sendMessage} disabled={!inputText.trim()} activeOpacity={0.6}>
+          <Animated.Text style={[styles.sendBtn, !inputText.trim() && styles.sendBtnDisabled, { transform: [{ scale: sendPop }] }]}>
+            Send
+          </Animated.Text>
         </TouchableOpacity>
       </View>
+
+      {/* Delete options sheet */}
+      {deleteVisible && (
+        <PostOptionsSheet
+          visible={deleteVisible}
+          onClose={() => setDeleteVisible(false)}
+          options={[
+            { label: 'Delete chat', icon: 'trash-outline', destructive: true, onPress: () => {} },
+          ]}
+          confirm={{
+            title: 'Delete this chat?',
+            body: 'This deletes the conversation for both of you. This can’t be undone.',
+            confirmLabel: 'Delete',
+            onConfirm: deleteChat,
+          }}
+        />
+      )}
     </KeyboardAvoidingView>
+  );
+}
+
+function MessageBubble({
+  item,
+  isMe,
+  hasMedia,
+  imageWidth,
+}: {
+  item: any;
+  isMe: boolean;
+  hasMedia: boolean;
+  imageWidth: number;
+}) {
+  const router = useRouter();
+  const [anim] = useState(() => new Animated.Value(0));
+
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: Duration.fast,
+      easing: Curves.standard,
+      useNativeDriver: true,
+    }).start();
+  }, [anim]);
+
+  return (
+    <Animated.View
+      style={[
+        styles.bubbleRow,
+        isMe ? styles.bubbleRowMe : styles.bubbleRowThem,
+        {
+          opacity: anim,
+          transform: [{
+            translateX: anim.interpolate({
+              inputRange: [0, 1],
+              outputRange: isMe ? [12, 0] : [-12, 0],
+            }),
+          }],
+        },
+      ]}
+    >
+      <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleThem, hasMedia && { paddingHorizontal: 0, paddingVertical: 0, overflow: 'hidden', maxWidth: '70%' }]}>
+        {hasMedia ? (
+          <>
+            <View>
+              <Image
+                source={{ uri: item.media_url }}
+                style={{ width: imageWidth, height: imageWidth * 1.25, borderRadius: 12 }}
+                resizeMode="cover"
+              />
+            </View>
+            {item.text ? (
+              <Text style={[styles.bubbleText, isMe ? styles.bubbleTextMe : styles.bubbleTextThem, { paddingHorizontal: 10, paddingVertical: 6 }]}>
+                {item.text}
+              </Text>
+            ) : null}
+            <TouchableOpacity
+              style={styles.viewPostBtn}
+              onPress={() => router.push(`/post/${item.post_id}` as any)}
+            >
+              <Ionicons name="eye-outline" size={14} color={Colors.white} />
+              <Text style={styles.viewPostText}>View Post</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <Text style={[styles.bubbleText, isMe ? styles.bubbleTextMe : styles.bubbleTextThem]}>
+            {item.text}
+          </Text>
+        )}
+      </View>
+    </Animated.View>
   );
 }
 
@@ -242,7 +313,6 @@ const styles = StyleSheet.create({
   backBtn: { padding: 4 },
   backIcon: { fontSize: 32, color: Colors.primary, lineHeight: 36 },
   deleteBtn: { padding: 4 },
-  deleteIcon: { fontSize: 20 },
   partnerName: {
     fontFamily: FontFamily.bold,
     fontSize: FontSize.bodyLg,

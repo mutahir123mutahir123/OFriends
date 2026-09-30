@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const KEY = 'loop_seen_stories';
+const KEY = 'ofriends_seen_stories';
 
 export async function getSeenUserIds(): Promise<Set<string>> {
   try {

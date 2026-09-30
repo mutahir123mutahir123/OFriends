@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   Alert,
   Share,
+  Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -21,8 +22,10 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 import { StoryRing } from '@/components/StoryRing';
 import { Avatar } from '@/components/Avatar';
+import { PostOptionsSheet } from '@/components/PostOptionsSheet';
 import { formatRelativeTime, parseMentions } from '@/lib/helpers';
 import { Colors, FontFamily, FontSize, Spacing, BorderRadius } from '@/lib/theme';
+import { Duration, Curves, Spring } from '@/lib/motion';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -37,6 +40,10 @@ export default function PostDetailScreen() {
   const [liked, setLiked] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [loading, setLoading] = useState(true);
+  const [deleteVisible, setDeleteVisible] = useState(false);
+
+  const [iconPop] = useState(() => new Animated.Value(1));
+  const [countAnim] = useState(() => new Animated.Value(1));
 
   const loadPost = useCallback(async () => {
     if (!id || !user) return;
@@ -82,6 +89,24 @@ export default function PostDetailScreen() {
     return () => { supabase.removeChannel(channel); };
   }, [id, user?.id]);
 
+  const popIcon = (to: number) => {
+    iconPop.setValue(1);
+    Animated.sequence([
+      Animated.spring(iconPop, { toValue: to, ...Spring.pop, useNativeDriver: true }),
+      Animated.spring(iconPop, { toValue: 1, ...Spring.pop, useNativeDriver: true }),
+    ]).start();
+  };
+
+  const pulseCount = () => {
+    countAnim.setValue(0);
+    Animated.timing(countAnim, {
+      toValue: 1,
+      duration: Duration.fast,
+      easing: Curves.standard,
+      useNativeDriver: true,
+    }).start();
+  };
+
   const toggleLike = async () => {
     if (!user || !id) return;
     if (liked) {
@@ -92,20 +117,18 @@ export default function PostDetailScreen() {
       await supabase.from('likes').insert({ user_id: user.id, post_id: id });
       setLiked(true);
       setLikeCount((c) => c + 1);
+      popIcon(1.32);
+      pulseCount();
     }
   };
 
   const deletePost = async () => {
-    Alert.alert('Delete Post', 'This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete', style: 'destructive', onPress: async () => {
-          const { error } = await supabase.from('posts').delete().eq('id', id);
-          if (error) Alert.alert('Error', error.message);
-          else router.back();
-        },
-      },
-    ]);
+    const { error } = await supabase.from('posts').delete().eq('id', id);
+    if (error) {
+      Alert.alert('Error', error.message);
+      return;
+    }
+    router.back();
   };
 
   const handleShare = async () => {
@@ -164,7 +187,14 @@ export default function PostDetailScreen() {
             <Ionicons name="paper-plane-outline" size={22} color={Colors.onSurface} />
           </TouchableOpacity>
           {post.user_id === user?.id && (
-            <TouchableOpacity onPress={deletePost} style={styles.headerAction}>
+            <TouchableOpacity
+              onPress={() => setDeleteVisible(true)}
+              style={styles.headerAction}
+              hitSlop={10}
+              activeOpacity={0.6}
+              accessibilityRole="button"
+              accessibilityLabel="Delete post"
+            >
               <Ionicons name="trash-outline" size={22} color={Colors.onSurface} />
             </TouchableOpacity>
           )}
@@ -190,13 +220,27 @@ export default function PostDetailScreen() {
 
         {/* Actions */}
         <View style={styles.actions}>
-          <TouchableOpacity onPress={toggleLike} style={styles.actionBtn}>
-            <Ionicons
-              name={liked ? 'heart' : 'heart-outline'}
-              size={26}
-              color={liked ? '#ff3b6f' : Colors.onSurface}
-            />
-            <Text style={styles.actionCount}>{likeCount}</Text>
+          <TouchableOpacity onPress={toggleLike} style={styles.actionBtn} activeOpacity={0.6}>
+            <Animated.View style={{ transform: [{ scale: iconPop }] }}>
+              <Ionicons
+                name={liked ? 'heart' : 'heart-outline'}
+                size={26}
+                color={liked ? '#ff3b6f' : Colors.onSurface}
+              />
+            </Animated.View>
+            <Animated.Text
+              style={[
+                styles.actionCount,
+                {
+                  opacity: countAnim.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] }),
+                  transform: [{
+                    translateY: countAnim.interpolate({ inputRange: [0, 1], outputRange: [4, 0] }),
+                  }],
+                },
+              ]}
+            >
+              {likeCount}
+            </Animated.Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionBtn}>
             <Ionicons name="chatbubble-outline" size={24} color={Colors.onSurface} />
@@ -222,13 +266,7 @@ export default function PostDetailScreen() {
         {/* Comments */}
         <View style={styles.commentsSection}>
           {comments.map((c) => (
-            <View key={c.id} style={styles.commentRow}>
-              <Avatar uri={c.profiles?.avatar_url} name={c.profiles?.username ?? '?'} size={32} />
-              <View style={styles.commentBubble}>
-                <Text style={styles.commentUser}>{c.profiles?.username} </Text>
-                <Text style={styles.commentText}>{c.content}</Text>
-              </View>
-            </View>
+            <CommentRow key={c.id} comment={c} />
           ))}
         </View>
         <View style={{ height: 100 }} />
@@ -250,7 +288,57 @@ export default function PostDetailScreen() {
           <Text style={[styles.postBtn, !commentText.trim() && styles.postBtnDisabled]}>Post</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Delete options sheet */}
+      {deleteVisible && (
+        <PostOptionsSheet
+          visible={deleteVisible}
+          onClose={() => setDeleteVisible(false)}
+          options={[
+            { label: 'Delete post', icon: 'trash-outline', destructive: true, onPress: () => {} },
+          ]}
+          confirm={{
+            title: 'Delete this post?',
+            body: "This can't be undone.",
+            confirmLabel: 'Delete',
+            onConfirm: deletePost,
+          }}
+        />
+      )}
     </KeyboardAvoidingView>
+  );
+}
+
+function CommentRow({ comment }: { comment: any }) {
+  const [anim] = useState(() => new Animated.Value(0));
+
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: 1,
+      duration: Duration.base,
+      easing: Curves.standard,
+      useNativeDriver: true,
+    }).start();
+  }, [anim]);
+
+  return (
+    <Animated.View
+      style={[
+        styles.commentRow,
+        {
+          opacity: anim,
+          transform: [{
+            translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }),
+          }],
+        },
+      ]}
+    >
+      <Avatar uri={comment.profiles?.avatar_url} name={comment.profiles?.username ?? '?'} size={32} />
+      <View style={styles.commentBubble}>
+        <Text style={styles.commentUser}>{comment.profiles?.username} </Text>
+        <Text style={styles.commentText}>{comment.content}</Text>
+      </View>
+    </Animated.View>
   );
 }
 

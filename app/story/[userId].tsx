@@ -27,6 +27,7 @@ import Animated, {
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 import { Avatar } from '@/components/Avatar';
+import { PostOptionsSheet } from '@/components/PostOptionsSheet';
 import { markUserSeen } from '@/lib/seenStories';
 import { Colors, FontFamily, FontSize, Spacing } from '@/lib/theme';
 
@@ -46,6 +47,7 @@ export default function StoryViewerScreen() {
   const [stories, setStories] = useState<any[]>([]);
   const [profile, setProfile] = useState<any>(null);
   const [index, setIndex] = useState(0);
+  const [deleteVisible, setDeleteVisible] = useState(false);
 
   const progress = useSharedValue(0);
 
@@ -164,31 +166,22 @@ export default function StoryViewerScreen() {
     return () => sub.remove();
   }, [pauseProgress, resumeProgress]);
 
-  const handleDeleteStory = () => {
+  const handleDeleteStory = async () => {
     const current = stories[index];
     if (!current) return;
-    Alert.alert('Delete Story', 'This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          cancelAnimation(progress);
-          const { error } = await supabase.from('stories').delete().eq('id', current.id);
-          if (error) {
-            Alert.alert('Error', error.message);
-          } else {
-            const remaining = stories.filter((s) => s.id !== current.id);
-            if (remaining.length === 0) {
-              router.back();
-            } else {
-              setStories(remaining);
-              if (index >= remaining.length) setIndex(remaining.length - 1);
-            }
-          }
-        },
-      },
-    ]);
+    cancelAnimation(progress);
+    const { error } = await supabase.from('stories').delete().eq('id', current.id);
+    if (error) {
+      Alert.alert('Error', error.message);
+    } else {
+      const remaining = stories.filter((s) => s.id !== current.id);
+      if (remaining.length === 0) {
+        router.back();
+      } else {
+        setStories(remaining);
+        if (index >= remaining.length) setIndex(remaining.length - 1);
+      }
+    }
   };
 
   const handleGrant = useCallback(
@@ -308,7 +301,14 @@ export default function StoryViewerScreen() {
         </View>
         <View style={styles.headerRight}>
           {isOwnStory && (
-            <TouchableOpacity onPress={handleDeleteStory} style={styles.iconBtn} hitSlop={8}>
+            <TouchableOpacity
+              onPress={() => setDeleteVisible(true)}
+              style={styles.iconBtn}
+              hitSlop={8}
+              activeOpacity={0.6}
+              accessibilityRole="button"
+              accessibilityLabel="Delete story"
+            >
               <Ionicons name="trash-outline" size={22} color={Colors.white} />
             </TouchableOpacity>
           )}
@@ -317,6 +317,22 @@ export default function StoryViewerScreen() {
           </TouchableOpacity>
         </View>
       </View>
+
+      {deleteVisible && (
+        <PostOptionsSheet
+          visible={deleteVisible}
+          onClose={() => setDeleteVisible(false)}
+          options={[
+            { label: 'Delete story', icon: 'trash-outline', destructive: true, onPress: () => {} },
+          ]}
+          confirm={{
+            title: 'Delete this story?',
+            body: "This can't be undone.",
+            confirmLabel: 'Delete',
+            onConfirm: handleDeleteStory,
+          }}
+        />
+      )}
     </View>
   );
 }

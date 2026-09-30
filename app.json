@@ -1,15 +1,15 @@
 {
   "expo": {
-    "name": "Loop",
-    "slug": "loop",
+    "name": "OFriends",
+    "slug": "ofriends",
     "version": "1.0.0",
-    "scheme": "loop",
+    "scheme": "ofriends",
     "orientation": "portrait",
     "icon": "./assets/logo.png",
     "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.loop.app"
+      "bundleIdentifier": "com.ofriends.app"
     },
     "android": {
       "adaptiveIcon": {
@@ -18,7 +18,7 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "package": "com.loop.app"
+      "package": "com.ofriends.app"
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -36,14 +36,14 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow Loop to access your camera to share Instants with friends."
+          "cameraPermission": "Allow OFriends to access your camera to share Instants with friends."
         }
       ],
       [
         "expo-media-library",
         {
-          "photosPermission": "Allow Loop to save Instants to your camera roll.",
-          "savePhotosPermission": "Allow Loop to save Instants to your camera roll.",
+          "photosPermission": "Allow OFriends to save Instants to your camera roll.",
+          "savePhotosPermission": "Allow OFriends to save Instants to your camera roll.",
           "isAccessMediaLocationEnabled": true
         }
       ],

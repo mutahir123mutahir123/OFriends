@@ -5,7 +5,7 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
-  Image,
+  Image as RNImage,
   Dimensions,
   Platform,
   Alert,
@@ -14,9 +14,11 @@ import {
   ActivityIndicator,
   TextInput,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, FontFamily, FontSize, Spacing, BorderRadius } from '@/lib/theme';
+import { Duration, Curves, Spring } from '@/lib/motion';
 import { useAuth } from '@/lib/auth';
 import { useNotifications } from '@/lib/notifications';
 import { useFeed, FeedMode } from '@/hooks/useFeed';
@@ -24,10 +26,13 @@ import { useStories } from '@/hooks/useStories';
 import { StoryRing } from '@/components/StoryRing';
 import { Avatar } from '@/components/Avatar';
 import { FeedSkeleton } from '@/components/skeletons/FeedSkeleton';
+import { PostOptionsSheet } from '@/components/PostOptionsSheet';
 import { formatRelativeTime, parseMentions } from '@/lib/helpers';
 import { supabase } from '@/lib/supabase';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+const TOGGLE_INSET = 3;   // matches toggle container padding in styles
 
 export default function FeedScreen() {
   const { user } = useAuth();
@@ -38,6 +43,14 @@ export default function FeedScreen() {
   const router = useRouter();
 
   const [sharingPost, setSharingPost] = useState<any>(null);
+  const [menuPost, setMenuPost] = useState<any>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+
+  const [toggleW, setToggleW] = useState(0);
+  const [modeAnim] = useState(() => new Animated.Value(mode === 'following' ? 0 : 1));
+  const [badgeAnim] = useState(() => new Animated.Value(0));
+  const [skeletonAnim] = useState(() => new Animated.Value(1));
+  const [skeletonDismissed, setSkeletonDismissed] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -46,28 +59,87 @@ export default function FeedScreen() {
     }, [refreshFeed, refreshStories])
   );
 
-  const handleDeletePost = async (postId: string) => {
-    Alert.alert('Delete Post', 'Are you sure you want to delete this post? This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete', style: 'destructive', onPress: async () => {
-          const { error } = await supabase.from('posts').delete().eq('id', postId);
-          if (error) Alert.alert('Error', error.message);
-          else refreshFeed();
-        }
-      }
-    ]);
+  useEffect(() => {
+    Animated.timing(modeAnim, {
+      toValue: mode === 'following' ? 0 : 1,
+      duration: Duration.base,
+      easing: Curves.standard,
+      useNativeDriver: true,
+    }).start();
+  }, [mode, modeAnim]);
+
+  useEffect(() => {
+    if (unreadCount <= 0) {
+      badgeAnim.setValue(0);
+      return;
+    }
+    badgeAnim.setValue(0);
+    Animated.spring(badgeAnim, { toValue: 1, ...Spring.pop, useNativeDriver: true }).start();
+  }, [unreadCount, badgeAnim]);
+
+  useEffect(() => {
+    if (skeletonDismissed) return;
+    if (loading && posts.length === 0) {
+      skeletonAnim.setValue(1);
+      return;
+    }
+    Animated.timing(skeletonAnim, {
+      toValue: 0,
+      duration: Duration.fast,
+      easing: Curves.standard,
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished) setSkeletonDismissed(true);
+    });
+  }, [loading, posts.length, skeletonDismissed, skeletonAnim]);
+
+  const handleDeletePost = async (post: any) => {
+    const { error } = await supabase.from('posts').delete().eq('id', post.id);
+    if (error) {
+      Alert.alert('Error', error.message);
+      return;
+    }
+    setRemovingId(post.id);
   };
+
+  const handleRemoved = useCallback(() => {
+    setRemovingId(null);
+    refreshFeed();
+  }, [refreshFeed]);
 
   const ListHeader = () => (
     <>
       {/* Top App Bar */}
       <View style={styles.appBar}>
-        <Image source={require('@/assets/logo.png')} style={styles.appNameLogo} resizeMode="contain" />
+        <RNImage source={require('@/assets/logo.png')} style={styles.appNameLogo} resizeMode="contain" />
 
-        <View style={styles.toggle}>
+        <View
+          style={styles.toggle}
+          onLayout={(e) => setToggleW(e.nativeEvent.layout.width)}
+        >
+          {toggleW > 0 && (
+            <Animated.View
+              style={[
+                styles.togglePill,
+                {
+                  width: (toggleW - TOGGLE_INSET * 2) / 2,
+                  transform: [
+                    {
+                      translateX: modeAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [
+                          TOGGLE_INSET,
+                          TOGGLE_INSET + (toggleW - TOGGLE_INSET * 2) / 2,
+                        ],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            />
+          )}
           <TouchableOpacity
-            style={[styles.toggleBtn, mode === 'following' && styles.toggleBtnActive]}
+            style={styles.toggleBtn}
             onPress={() => setMode('following')}
             activeOpacity={0.8}
           >
@@ -76,7 +148,7 @@ export default function FeedScreen() {
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.toggleBtn, mode === 'discover' && styles.toggleBtnActive]}
+            style={styles.toggleBtn}
             onPress={() => setMode('discover')}
             activeOpacity={0.8}
           >
@@ -90,9 +162,14 @@ export default function FeedScreen() {
           <View>
             <Ionicons name="notifications-outline" size={24} color={Colors.onSurface} />
             {unreadCount > 0 && (
-              <View style={styles.bellBadge}>
+              <Animated.View
+                style={[
+                  styles.bellBadge,
+                  { opacity: badgeAnim, transform: [{ scale: badgeAnim }] },
+                ]}
+              >
                 <Text style={styles.bellBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
-              </View>
+              </Animated.View>
             )}
           </View>
         </TouchableOpacity>
@@ -174,11 +251,6 @@ export default function FeedScreen() {
     );
   };
 
-  // Show skeleton only on first load (no posts yet)
-  if (loading && posts.length === 0) {
-    return <FeedSkeleton />;
-  }
-
   return (
     <View style={styles.container}>
       <FlatList
@@ -188,7 +260,10 @@ export default function FeedScreen() {
           <PostCard
             post={item}
             currentUserId={user?.id ?? ''}
-            onDelete={handleDeletePost}
+            onOpenOptions={setMenuPost}
+            menuOpen={menuPost?.id === item.id}
+            removing={removingId === item.id}
+            onRemoved={handleRemoved}
             onShare={setSharingPost}
           />
         )}
@@ -200,12 +275,44 @@ export default function FeedScreen() {
         showsVerticalScrollIndicator={false}
       />
 
+      {/* Skeleton crossfade — overlays the list until the first payload lands */}
+      {!skeletonDismissed && (
+        <Animated.View
+          style={[styles.skeletonLayer, { opacity: skeletonAnim }]}
+          pointerEvents="none"
+        >
+          <FeedSkeleton />
+        </Animated.View>
+      )}
+
       {/* In-app share sheet */}
       {sharingPost && (
         <ShareModal
           post={sharingPost}
           userId={user?.id ?? ''}
           onClose={() => setSharingPost(null)}
+        />
+      )}
+
+      {/* Post options / delete sheet */}
+      {menuPost && (
+        <PostOptionsSheet
+          visible={!!menuPost}
+          onClose={() => setMenuPost(null)}
+          options={[
+            {
+              label: 'Delete post',
+              icon: 'trash-outline',
+              destructive: true,
+              onPress: () => handleDeletePost(menuPost),
+            },
+          ]}
+          confirm={{
+            title: 'Delete this post?',
+            body: "This can't be undone.",
+            confirmLabel: 'Delete',
+            onConfirm: () => handleDeletePost(menuPost),
+          }}
         />
       )}
     </View>
@@ -215,11 +322,22 @@ export default function FeedScreen() {
 type PostCardProps = {
   post: any;
   currentUserId: string;
-  onDelete: (id: string) => void;
+  onOpenOptions: (post: any) => void;
+  menuOpen: boolean;
+  removing: boolean;
+  onRemoved: () => void;
   onShare: (post: any) => void;
 };
 
-function PostCard({ post, currentUserId, onDelete, onShare }: PostCardProps) {
+function PostCard({
+  post,
+  currentUserId,
+  onOpenOptions,
+  menuOpen,
+  removing,
+  onRemoved,
+  onShare,
+}: PostCardProps) {
   const router = useRouter();
   const imageHeight = SCREEN_WIDTH * (5 / 4);
   const isOwner = post.user_id === currentUserId;
@@ -255,6 +373,7 @@ function PostCard({ post, currentUserId, onDelete, onShare }: PostCardProps) {
   const toggleSave = async () => {
     const next = !saved;
     setSaved(next);
+    popIcon(bookmarkPop, 1.26);
     if (next) {
       await supabase.from('saved_posts').insert({ user_id: currentUserId, post_id: post.id });
     } else {
@@ -266,12 +385,66 @@ function PostCard({ post, currentUserId, onDelete, onShare }: PostCardProps) {
   const [heartScale] = useState(() => new Animated.Value(0));
   const [heartOpacity] = useState(() => new Animated.Value(0));
 
+  // Micro-interactions
+  const [moreAnim] = useState(() => new Animated.Value(0));
+  const [iconPop] = useState(() => new Animated.Value(1));
+  const [countAnim] = useState(() => new Animated.Value(0));
+  const [bookmarkPop] = useState(() => new Animated.Value(1));
+  const [collapseOpacity] = useState(() => new Animated.Value(1));
+  const [collapseY] = useState(() => new Animated.Value(0));
+
+  useEffect(() => {
+    Animated.spring(moreAnim, {
+      toValue: menuOpen ? 1 : 0,
+      ...Spring.pop,
+      useNativeDriver: true,
+    }).start();
+  }, [menuOpen, moreAnim]);
+
+  useEffect(() => {
+    if (!removing) return;
+    Animated.parallel([
+      Animated.timing(collapseOpacity, {
+        toValue: 0,
+        duration: Duration.fast,
+        easing: Curves.exit,
+        useNativeDriver: true,
+      }),
+      Animated.timing(collapseY, {
+        toValue: -14,
+        duration: Duration.fast,
+        easing: Curves.exit,
+        useNativeDriver: true,
+      }),
+    ]).start(() => onRemoved());
+  }, [removing, collapseOpacity, collapseY, onRemoved]);
+
+  const popIcon = (anim: Animated.Value, to: number) => {
+    anim.setValue(1);
+    Animated.sequence([
+      Animated.spring(anim, { toValue: to, ...Spring.pop, useNativeDriver: true }),
+      Animated.spring(anim, { toValue: 1, ...Spring.pop, useNativeDriver: true }),
+    ]).start();
+  };
+
+  const pulseCount = () => {
+    countAnim.setValue(0);
+    Animated.timing(countAnim, {
+      toValue: 1,
+      duration: Duration.fast,
+      easing: Curves.standard,
+      useNativeDriver: true,
+    }).start();
+  };
+
   // Double-tap detection
   const lastTap = useRef<number>(0);
 
   const burstHeart = () => {
     heartScale.setValue(0);
     heartOpacity.setValue(1);
+    popIcon(iconPop, 1.32);
+    pulseCount();
     Animated.parallel([
       Animated.spring(heartScale, { toValue: 1, useNativeDriver: true, bounciness: 12 }),
       Animated.sequence([
@@ -314,6 +487,8 @@ function PostCard({ post, currentUserId, onDelete, onShare }: PostCardProps) {
     } else {
       setLiked(true);
       setLikeCount((c) => c + 1);
+      popIcon(iconPop, 1.32);
+      pulseCount();
       const { error } = await supabase.from('likes').insert({ user_id: currentUserId, post_id: post.id });
       if (error) {
         setLiked(false);
@@ -328,15 +503,17 @@ function PostCard({ post, currentUserId, onDelete, onShare }: PostCardProps) {
   };
 
   const handleLongPress = () => {
-    if (!isOwner) return;
-    Alert.alert('Post Options', '', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: '🗑 Delete Post', style: 'destructive', onPress: () => onDelete(post.id) },
-    ]);
+    if (!isOwner || menuOpen) return;
+    onOpenOptions(post);
   };
 
   return (
-    <View style={styles.postCard}>
+    <Animated.View
+      style={[
+        styles.postCard,
+        { opacity: collapseOpacity, transform: [{ translateY: collapseY }] },
+      ]}
+    >
       {/* Header */}
       <TouchableOpacity
         style={styles.postHeader}
@@ -352,8 +529,39 @@ function PostCard({ post, currentUserId, onDelete, onShare }: PostCardProps) {
           <Text style={styles.postTime}>{formatRelativeTime(post.created_at)}</Text>
         </View>
         {isOwner && (
-          <TouchableOpacity onPress={handleLongPress} style={styles.moreBtn}>
-            <Ionicons name="ellipsis-horizontal" size={20} color={Colors.onSurfaceVariant} />
+          <TouchableOpacity
+            onPress={handleLongPress}
+            style={styles.moreBtn}
+            hitSlop={12}
+            activeOpacity={0.6}
+            accessibilityRole="button"
+            accessibilityLabel="Post options"
+            accessibilityHint="Double tap to delete this post"
+          >
+            <Animated.View
+              style={{
+                transform: [
+                  {
+                    rotate: moreAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['0deg', '90deg'],
+                    }),
+                  },
+                  {
+                    scale: moreAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.88, 1],
+                    }),
+                  },
+                ],
+              }}
+            >
+              <Ionicons
+                name="ellipsis-horizontal"
+                size={20}
+                color={Colors.onSurfaceVariant}
+              />
+            </Animated.View>
           </TouchableOpacity>
         )}
       </TouchableOpacity>
@@ -366,7 +574,12 @@ function PostCard({ post, currentUserId, onDelete, onShare }: PostCardProps) {
         delayLongPress={500}
       >
         <View style={[styles.postMedia, { height: imageHeight }]}>
-          <Image source={{ uri: post.media_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          <Image
+            source={{ uri: post.media_url }}
+            style={StyleSheet.absoluteFill}
+            contentFit="cover"
+            transition={200}
+          />
           {/* Floating heart burst on double tap */}
           <Animated.View
             style={[styles.heartBurst, { opacity: heartOpacity, transform: [{ scale: heartScale }] }]}
@@ -380,30 +593,47 @@ function PostCard({ post, currentUserId, onDelete, onShare }: PostCardProps) {
       {/* Actions */}
       <View style={styles.postActions}>
         <View style={styles.postActionsLeft}>
-          <TouchableOpacity style={styles.actionBtn} onPress={toggleLike}>
-            <Ionicons
-              name={liked ? 'heart' : 'heart-outline'}
-              size={26}
-              color={liked ? '#ff3b6f' : Colors.onSurface}
-            />
-            <Text style={styles.likeCount}>{likeCount}</Text>
+          <TouchableOpacity style={styles.actionBtn} onPress={toggleLike} activeOpacity={0.6}>
+            <Animated.View style={{ transform: [{ scale: iconPop }] }}>
+              <Ionicons
+                name={liked ? 'heart' : 'heart-outline'}
+                size={26}
+                color={liked ? '#ff3b6f' : Colors.onSurface}
+              />
+            </Animated.View>
+            <Animated.Text
+              style={[
+                styles.likeCount,
+                {
+                  opacity: countAnim.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] }),
+                  transform: [{
+                    translateY: countAnim.interpolate({ inputRange: [0, 1], outputRange: [4, 0] }),
+                  }],
+                },
+              ]}
+            >
+              {likeCount}
+            </Animated.Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.actionBtn}
             onPress={() => router.push(`/post/${post.id}` as any)}
+            activeOpacity={0.6}
           >
             <Ionicons name="chatbubble-outline" size={24} color={Colors.onSurface} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionBtn} onPress={handleShare}>
+          <TouchableOpacity style={styles.actionBtn} onPress={handleShare} activeOpacity={0.6}>
             <Ionicons name="paper-plane-outline" size={24} color={Colors.onSurface} />
           </TouchableOpacity>
         </View>
-        <TouchableOpacity onPress={toggleSave}>
-          <Ionicons
-            name={saved ? 'bookmark' : 'bookmark-outline'}
-            size={24}
-            color={saved ? Colors.primary : Colors.onSurface}
-          />
+        <TouchableOpacity onPress={toggleSave} activeOpacity={0.6}>
+          <Animated.View style={{ transform: [{ scale: bookmarkPop }] }}>
+            <Ionicons
+              name={saved ? 'bookmark' : 'bookmark-outline'}
+              size={24}
+              color={saved ? Colors.primary : Colors.onSurface}
+            />
+          </Animated.View>
         </TouchableOpacity>
       </View>
 
@@ -425,13 +655,21 @@ function PostCard({ post, currentUserId, onDelete, onShare }: PostCardProps) {
           </TouchableOpacity>
         </View>
       ) : null}
-    </View>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   feedContent: { paddingBottom: 100 },
+  skeletonLayer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: Colors.background,
+  },
 
   // App bar
   appBar: {
@@ -463,7 +701,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: BorderRadius.full,
   },
-  toggleBtnActive: {
+  togglePill: {
+    position: 'absolute',
+    top: TOGGLE_INSET,
+    bottom: TOGGLE_INSET,
+    borderRadius: BorderRadius.full,
     backgroundColor: Colors.primaryContainer,
   },
   toggleText: {

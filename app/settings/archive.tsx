@@ -15,6 +15,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
+import { PostOptionsSheet } from '@/components/PostOptionsSheet';
 import { Colors, FontFamily, FontSize, Spacing } from '@/lib/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -25,6 +26,7 @@ export default function ArchiveScreen() {
   const { user } = useAuth();
   const [stories, setStories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -43,19 +45,10 @@ export default function ArchiveScreen() {
     })();
   }, [user, load]);
 
-  const deleteStory = (storyId: string) => {
-    Alert.alert('Delete Story', 'Remove this story permanently?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          const { error } = await supabase.from('stories').delete().eq('id', storyId);
-          if (error) Alert.alert('Error', error.message);
-          else setStories((prev) => prev.filter((s) => s.id !== storyId));
-        },
-      },
-    ]);
+  const deleteStory = async (storyId: string) => {
+    const { error } = await supabase.from('stories').delete().eq('id', storyId);
+    if (error) Alert.alert('Error', error.message);
+    else setStories((prev) => prev.filter((s) => s.id !== storyId));
   };
 
   const isExpired = (expiresAt: string) => new Date(expiresAt) < new Date();
@@ -97,12 +90,16 @@ export default function ArchiveScreen() {
               return (
                 <TouchableOpacity
                   style={styles.cell}
-                  onLongPress={() => deleteStory(item.id)}
+                  onLongPress={() => setDeleting(item.id)}
                   delayLongPress={500}
                   activeOpacity={0.85}
+                  accessibilityLabel="Story. Long press for options."
                 >
                   <Image source={{ uri: item.media_url }} style={styles.cellImage} resizeMode="cover" />
                   {expired && <View style={styles.expiredOverlay} />}
+                  <View style={styles.cellBadge}>
+                    <Ionicons name="ellipsis-horizontal" size={12} color={Colors.onSurface} />
+                  </View>
                   <Text style={styles.dateLabel}>{dateLabel}</Text>
                 </TouchableOpacity>
               );
@@ -110,12 +107,40 @@ export default function ArchiveScreen() {
           />
         </>
       )}
+
+      {deleting && (
+        <PostOptionsSheet
+          visible={!!deleting}
+          onClose={() => setDeleting(null)}
+          options={[
+            { label: 'Delete story', icon: 'trash-outline', destructive: true, onPress: () => {} },
+          ]}
+          confirm={{
+            title: 'Delete this story?',
+            body: 'This removes the story permanently and can’t be undone.',
+            confirmLabel: 'Delete',
+            onConfirm: () => deleteStory(deleting),
+          }}
+        />
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
+  cellBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    zIndex: 10,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderRadius: 9,
+    width: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
