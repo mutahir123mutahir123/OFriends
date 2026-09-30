@@ -16,7 +16,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as FileSystem from 'expo-file-system/legacy';
-import { supabase } from '@/lib/supabase';
+import { supabase, supabaseAnonKey, supabaseUrl } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 import { compressImage, compressStoryImage, formatBytes } from '@/lib/compress';
 import { Colors, FontFamily, FontSize, Spacing, BorderRadius } from '@/lib/theme';
@@ -104,7 +104,6 @@ export default function UploadScreen() {
     mimeType: string,
     token: string,
   ): Promise<string> => {
-    const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
     const resp = await FileSystem.uploadAsync(
       `${supabaseUrl}/storage/v1/object/media/${storagePath}`,
       localUri,
@@ -128,7 +127,7 @@ export default function UploadScreen() {
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token ?? process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
+      const token = session?.access_token ?? supabaseAnonKey;
       const base = `${user.id}/${Date.now()}`;
 
       // ── Compress, then upload ──────────────────────────────────────────────

@@ -1,8 +1,26 @@
 import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
+function requireEnv(name: string, value: string | undefined): string {
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new Error(
+      `${name} is missing from the JS bundle. EXPO_PUBLIC_ values are inlined at ` +
+        `build time, so this must be an EAS environment variable — a .env.local file ` +
+        `is gitignored and never reaches EAS Build.`
+    );
+  }
+  return value.trim();
+}
+
+export const supabaseUrl = requireEnv('EXPO_PUBLIC_SUPABASE_URL', process.env.EXPO_PUBLIC_SUPABASE_URL);
+export const supabaseAnonKey = requireEnv('EXPO_PUBLIC_SUPABASE_ANON_KEY', process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY);
+
+if (!/^https?:\/\/\S+$/.test(supabaseUrl)) {
+  throw new Error(
+    `EXPO_PUBLIC_SUPABASE_URL is not a valid URL (got ${JSON.stringify(supabaseUrl)}). ` +
+      'Check the EAS variable for stray quotes or trailing whitespace.'
+  );
+}
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {

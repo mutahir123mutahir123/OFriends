@@ -21,7 +21,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { compressImage } from '@/lib/compress';
 import { LinearGradient } from 'expo-linear-gradient';
-import { supabase } from '@/lib/supabase';
+import { supabase, supabaseAnonKey, supabaseUrl } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
 import { StoryRing } from '@/components/StoryRing';
 import { Avatar } from '@/components/Avatar';
@@ -155,9 +155,8 @@ export default function ProfileScreen() {
       const fileName = `${user.id}/avatar_${Date.now()}.jpg`;
 
       // Upload using FileSystem.uploadAsync natively (fixes react native blob issues)
-      const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
       const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token ?? process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
+      const token = session?.access_token ?? supabaseAnonKey;
 
       const uploadResponse = await FileSystem.uploadAsync(
         `${supabaseUrl}/storage/v1/object/avatars/${fileName}`,
